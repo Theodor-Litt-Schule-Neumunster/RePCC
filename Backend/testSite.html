@@ -1,0 +1,103 @@
+<!-- This site is just to test the API calls. No functional use in the final product. -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    #informationDiv{
+        text-align: center;
+        background-color: #131313;
+    }
+    #laser-touchpad{
+        background-color: azure;
+        aspect-ratio: 16/9;
+        max-width: 50%;
+        max-height: 300px;
+
+        margin-left: auto;
+        margin-right: auto;
+    }
+</style>
+
+<script>
+    async function sendPing() {
+        const infoHeader = document.getElementById("informationDiv")
+        infoHeader.innerText = "Sending ping to http://127.0.0.1:15248/ping"
+        console.log("sending ping to local adress")
+
+        try {
+            const response = await fetch("http://127.0.0.1:15248/ping")
+            if (response.ok) {
+                infoHeader.innerText = "Ping success."
+            } else {
+                infoHeader.innerText = "Ping failed."
+            }
+        } catch (error) {
+            infoHeader.innerText = "Full Error on Ping. Your request did not go through. Please check if the server is running."
+        }
+    }
+
+</script>
+
+<body bgcolor="#111111" style="font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif; color: azure;">
+    
+    <div id="informationDiv">Loading...</div>
+    
+    <center><h1>WebCommunication test</h1></center>
+
+    <div> <!-- Button div -->
+        <button onclick="sendPing()">Send Ping</button>
+    </div>
+    
+    <br><br><br>
+    <center><h3>Laser-Touchpad</h3></center>
+    <div id="laser-touchpad"></div>
+
+
+     
+</body>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+        const infoHeader = document.getElementById("informationDiv")
+        const touchpad = document.getElementById("laser-touchpad")
+
+        infoHeader.innerText = "Fully loaded."
+
+        // Touchpad
+
+        touchpad.addEventListener("mousedown", () => {
+
+            let isdrag = false
+            let haschanged = false
+            let movelistener
+            infoHeader.innerText = "drag start"
+
+            movelistener = touchpad.addEventListener("mousemove", (ev) => {
+                if (haschanged == false) {haschanged = true; isdrag = true}
+                if (!isdrag) {
+                    infoHeader.innerText = "Drag finished"
+                    touchpad.removeEventListener(movelistener)
+                }
+
+                offsetX = ev.offsetX/touchpad.offsetWidth
+                offsetY = ev.offsetY/touchpad.offsetHeight
+                infoHeader.innerText = isdrag + " " + haschanged + "| x: " + offsetX + " y: " + offsetY
+            })
+
+            touchpad.addEventListener("mouseup", (ev) => {
+                if (haschanged && isdrag) {isdrag = false}
+                return
+            })
+        })
+    })
+
+    
+
+
+</script>
+</html>
