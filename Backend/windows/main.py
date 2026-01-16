@@ -1,9 +1,20 @@
+# imports
+
 import os
-import fastapi
+#import fastapi     # unused for now
 import uvicorn
+
+# --
+# from's
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# --
+# custom imports
+import laser
+from laser import StartLaserpointer, UpdateLaserpointer, ClearLaserpointer
+# --
 
 os.system("cls")
 
@@ -29,6 +40,30 @@ App.add_middleware(
 async def root():
     return {"message":"Success"}
 
+@App.post("/laser/start")
+async def startlaser() -> dict[str, str]:
+    try:
+        await StartLaserpointer()
+        return {"status":"laserpointer_start"}
+    except Exception as e:
+        print(e)
+        return {"error":str(e)}
+    
+@App.post("/laser/update")
+async def updatelaser(pos:laser.LaserPos) -> dict[str, str]:
+    try:
+        if laser.overlay is None:
+            print("overlay not avalible")
+            return {"error":"overlay not avalible"}
+        
+        await UpdateLaserpointer(pos) 
+        return {"status":"laserpointer_update_success"}
+    except Exception as e:
+        print(e)
+        return {"error":str(e)}
+    
+
+    
 if __name__ == "__main__":
     print("Running main")
     uvicorn.run(App, host="127.0.0.1", port=15248)
