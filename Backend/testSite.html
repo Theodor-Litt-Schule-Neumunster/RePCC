@@ -72,25 +72,32 @@
 
         touchpad.addEventListener("mousedown", () => {
 
+            console.log("mouse down")
+
             let isdrag = false
             let haschanged = false
             let movelistener
             infoHeader.innerText = "drag start"
 
-            movelistener = touchpad.addEventListener("mousemove", (ev) => {
+            function dragEvent(ev) {
+                
                 if (haschanged == false) {haschanged = true; isdrag = true}
                 if (!isdrag) {
                     infoHeader.innerText = "Drag finished"
-                    touchpad.removeEventListener(movelistener)
+                    touchpad.removeEventListener("mousemove", dragEvent)
+                    return
                 }
 
                 offsetX = ev.offsetX/touchpad.offsetWidth
                 offsetY = ev.offsetY/touchpad.offsetHeight
                 infoHeader.innerText = isdrag + " " + haschanged + "| x: " + offsetX + " y: " + offsetY
-            })
+            }
+
+            touchpad.addEventListener("mousemove", dragEvent)
 
             touchpad.addEventListener("mouseup", (ev) => {
                 if (haschanged && isdrag) {isdrag = false}
+                console.log("up")
                 return
             })
         })
