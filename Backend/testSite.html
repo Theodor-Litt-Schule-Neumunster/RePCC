@@ -26,6 +26,9 @@
 <script>
     let successfulPing = false
 
+    var lastupdate = Date.now()
+    console.log(lastupdate)
+
     async function sendPing() {
         const infoHeader = document.getElementById("informationDiv")
         infoHeader.innerText = "Sending ping to http://127.0.0.1:15248/ping"
@@ -119,18 +122,21 @@
                 
                 if (!successfulPing) {
                     infoHeader.innerText = "Touchpad Update will only work if one successful ping has been send."
-                } else 
-                try {
-                    fetch("http://127.0.0.1:15248/laser/update", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({ x: offsetX, y: offsetY })
-                    })
-                } catch (error) {
-                    error(error)
-                }
+                } else if ((Date.now()-lastupdate) > 17) {
+                    lastupdate = Date.now()
+                    try {
+                        fetch("http://127.0.0.1:15248/laser/update", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({ x: offsetX, y: offsetY })
+                        })
+                    } catch (error) {
+                        error(error)
+                    }
+                } else {console.log("timeout for drag")}
+                
             }
 
             touchpad.addEventListener("mousemove", dragEvent)
