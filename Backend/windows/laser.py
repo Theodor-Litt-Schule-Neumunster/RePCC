@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from PyQt5.QtWidgets import QApplication, QWidget
-from PyQt5.QtGui import QPainter, QColor, QGuiApplication
+from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent
 from PyQt5.QtCore import Qt
 import sys
 import threading
 import win32gui
 import win32con
+
+# this is so cool
 
 # globals
 overlay = None
@@ -28,11 +30,12 @@ class LaserOverlay(QWidget):
         super().__init__()
 
         # Frameless screen that always stays on top w. transparent bg
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool) # type: ignore[attr-defined]
+        self.setAttribute(Qt.WA_TranslucentBackground) # type: ignore[attr-defined]
 
         # fullscreen over primary screen
-        screen = QGuiApplication.primaryScreen().geometry()
+        screen = QGuiApplication.primaryScreen().geometry() # type: ignore[attr-defined] 
         self.setGeometry(screen)
 
         self.dot_x = screen.width() // 2
@@ -42,7 +45,7 @@ class LaserOverlay(QWidget):
         self.make_click_through()
         self.show()
 
-    def make_click_through(self):
+    def make_click_through(self) -> None:
         """
         make_click_through makes a fullscreen invisible window, where the clicks pass through, 
         so the mouse is not disturbed.
@@ -57,8 +60,116 @@ class LaserOverlay(QWidget):
         except Exception as e:
             print("Error at make_click_through, ", e)
     
-    def paintEvent():
-        ...
+    def paintEvent(self, a0:QPaintEvent) -> None: # type: ignore[attr-defined]
+        """
+        Draws the red dot.
+        
+        :param self:
+        :param a0: 
+        :type a0: QPaintEvent
+        """
 
-    def updatePos():
-        ...
+        print("Paintevent triggered.")
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        painter.setPen(Qt.NoPen) # type: ignore[attr-defined]
+        painter.setBrush(QColor(255,0,0,220))
+        painter.drawEllipse(self.dot_x - 9, self.dot_y - 9, 18, 18)
+
+
+    def updatePos(self, norm_x:float, norm_y:float) -> None:
+        """
+        Updates the laserpointer pos and re-draws the overlay.
+        
+        :param self:
+        :param norm_x: A number between 0 - 1 describing how far right the dot is on the screen.
+        :type norm_x: float
+        :param norm_y: A number between 0 - 1 describing how far down the dot is on the screen.
+        :type norm_y: float
+        """
+        print("recieved pos update with data ", norm_x, norm_y)
+        screen = QGuiApplication.primaryScreen().geometry() # type: ignore[attr-defined]
+
+        self.dot_x = int(norm_x * screen.width())
+        self.dot_y = int(norm_y * screen.height())
+
+        self.repaint() # New draw on screen.
+
+def _qt_loop():
+    print("QT loop running.")
+    global App
+
+    App = QApplication(sys.argv)
+    sys.exit(App.exec_())
+    print("Sys exit.")
+
+async def StartLaserpointer() -> tuple[bool, str]:
+    """
+    Starts a fullscreen transparent overlay where a laserpointer will be displayed.
+    
+    :return: bool shows if execution was a success. str is appended message, e.g error.
+    :rtype: tuple[bool, str]
+    """
+    global overlay
+
+    print("Starting laserpointer...")
+
+    try:
+        if overlay is None:
+            print("Overlay none")
+            threading.Thread(target=_qt_loop, daemon=True).start()
+
+        import time
+        time.sleep(1)
+        print("Praying to god it starts...")
+        overlay = LaserOverlay()
+        print("IT STARTED!")
+
+        return (True, "Great success!")
+    except Exception as e:
+        print(e)
+        return (False, str(e))
+    
+async def UpdateLaserpointer(pos: LaserPos) -> tuple[bool, str]:
+    """
+    Updates the position of the Laserpointer.
+    
+    :param pos: Position of the laserpointer dot
+    :type pos: LaserPos
+    :return: shows if execution was a success. str is appended message, e.g error.
+    :rtype: tuple[bool, str]
+    """
+    global overlay
+
+    print("updating overlay")
+
+    try:
+        if overlay is None:
+            print("not ready")
+            return (False, "Overlay is not ready.")
+        
+        overlay.updatePos(pos.x, pos.y)
+        return (True, "Position updates successfully.")
+    except Exception as e:
+        print(e)
+        return (False, str(e))
+    
+async def ClearLaserpointer() -> tuple[bool, str]:
+    """
+    Clears the laserpointer.
+    
+    :return: shows if execution was a success. str is appended message, e.g error.
+    :rtype: tuple[bool, str]
+    """
+    global overlay
+
+    try:
+        if overlay is not None:
+            overlay.close()
+            overlay = None
+
+        return (True, "Overlay cleared.")
+    except Exception as e:
+        print(e)
+        return (False, str(e))

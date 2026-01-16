@@ -24,6 +24,8 @@
 </style>
 
 <script>
+    let successfulPing = false
+
     async function sendPing() {
         const infoHeader = document.getElementById("informationDiv")
         infoHeader.innerText = "Sending ping to http://127.0.0.1:15248/ping"
@@ -33,11 +35,31 @@
             const response = await fetch("http://127.0.0.1:15248/ping")
             if (response.ok) {
                 infoHeader.innerText = "Ping success."
+                successfulPing = true
             } else {
                 infoHeader.innerText = "Ping failed."
             }
         } catch (error) {
             infoHeader.innerText = "Full Error on Ping. Your request did not go through. Please check if the server is running."
+        }
+    }
+
+    async function startLaser() {
+        const infoHeader = document.getElementById("informationDiv")
+        infoHeader.innerText = "Starting Pointer..."
+        try {
+            const response = await fetch("http://127.0.0.1:15248/laser/start", {
+                method: "POST"
+            })
+
+            if (response.ok) {
+                infoHeader.innerText = "Laser start success"
+            } else {
+                infoHeader.innerText = "Laser start failed."
+            }
+        } catch (error) {
+            infoHeader.innerText = "Fatal start error, consult console."
+            console.log(error)
         }
     }
 
@@ -51,6 +73,8 @@
 
     <div> <!-- Button div -->
         <button onclick="sendPing()">Send Ping</button>
+        <button onclick="startLaser()">Start Laserpointer</button>
+        <button onclick="">Stop Laserpointer</button>
     </div>
     
     <br><br><br>
@@ -62,6 +86,7 @@
 </body>
 
 <script>
+
     document.addEventListener("DOMContentLoaded", function(){
         const infoHeader = document.getElementById("informationDiv")
         const touchpad = document.getElementById("laser-touchpad")
@@ -91,6 +116,21 @@
                 offsetX = ev.offsetX/touchpad.offsetWidth
                 offsetY = ev.offsetY/touchpad.offsetHeight
                 infoHeader.innerText = isdrag + " " + haschanged + "| x: " + offsetX + " y: " + offsetY
+                
+                if (!successfulPing) {
+                    infoHeader.innerText = "Touchpad Update will only work if one successful ping has been send."
+                } else 
+                try {
+                    fetch("http://127.0.0.1:15248/laser/update", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ x: offsetX, y: offsetY })
+                    })
+                } catch (error) {
+                    error(error)
+                }
             }
 
             touchpad.addEventListener("mousemove", dragEvent)
