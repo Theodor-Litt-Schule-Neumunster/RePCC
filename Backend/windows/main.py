@@ -35,7 +35,6 @@ App.add_middleware(
     allow_headers=["*"],
 )
 
-
 @App.get("/ping")
 async def root():
     return {"message":"Success"}
@@ -61,9 +60,8 @@ async def updatelaser(pos:laser.LaserPos) -> dict[str, str]:
     except Exception as e:
         print(e)
         return {"error":str(e)}
-    
 
-    
 if __name__ == "__main__":
-    print("Running main")
-    uvicorn.run(App, host="127.0.0.1", port=15248)
+    if os.name == "nt":
+        print("Running main")
+        uvicorn.run(App, host="127.0.0.1", port=15248)
