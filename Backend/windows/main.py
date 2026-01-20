@@ -65,3 +65,5 @@ if __name__ == "__main__":
     if os.name == "nt":
         print("Running main")
         uvicorn.run(App, host="127.0.0.1", port=15248)
+    else:
+        print("OS is not NTFS")
