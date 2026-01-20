@@ -137,13 +137,15 @@
                 
             }
 
-            touchpad.addEventListener("mousemove", dragEvent)
-
-            touchpad.addEventListener("mouseup", (ev) => {
+            function stopDrag(ev) {
                 if (haschanged && isdrag) {isdrag = false}
                 console.log("up")
+                touchpad.removeEventListener("mouseup", stopDrag)
                 return
-            })
+            }     
+
+            touchpad.addEventListener("mousemove", dragEvent)
+            touchpad.addEventListener("mouseup", stopDrag)
         })
     })
 
