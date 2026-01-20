@@ -119,11 +119,14 @@ async def StartLaserpointer() -> tuple[bool, str]:
             print("Overlay none")
             threading.Thread(target=_qt_loop, daemon=True).start()
 
-        import time
-        time.sleep(1)
-        print("Praying to god it starts...")
-        overlay = LaserOverlay()
-        print("IT STARTED!")
+            import time
+            time.sleep(1)
+            print("Praying to god it starts...")
+            overlay = LaserOverlay()
+            print("IT STARTED!")
+        
+        else:
+            print("Laser is already running. Clear it before starting another.")
 
         return (True, "Great success!")
     except Exception as e:
