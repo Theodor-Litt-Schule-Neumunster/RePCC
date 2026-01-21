@@ -2,26 +2,30 @@
 import os
 import sys
 import json
+import shutil
 import ctypes
 import winreg
+import subprocess
 
 APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
 
-FILEVER = "0.1"
+FILEVER = "0.15"
 
 if __name__ == "__main__":
+
     def init():
         os.system("cls")
 
         print("init says \"Hello World!\"")
 
-        # Reference to how the folders are build, ver 0.1
+        # Reference to how the folders are build, ver 0.15
         filestructure = {
             ".RePCC": [
                 "macros",
                 "settings",
+                "assets"
             ],
         }
 
@@ -42,6 +46,13 @@ if __name__ == "__main__":
                         if not os.path.exists(dir):
                             os.mkdir(dir)
                             print("    > *\\"+subkey+" has been created.")
+
+                            if subkey == "assets":
+                                dir = os.path.dirname(__file__)
+                                shutil.copyfile(dir+"\\assets\\repcclogo.ico", MACDATA+"\\assets\\repcc.ico")
+                                print("        > copied RePCC icon asset folder")
+                                shutil.copyfile(dir+"\\assets\\scriptlogo.ico", MACDATA+"\\assets\\script.ico")
+                                print("        > copied script icon into asset folder")
                         
                         else:
                             print("    > *\\"+subkey+" already exists.")
@@ -77,6 +88,19 @@ if __name__ == "__main__":
         def regVerification():
             print("\nRegistry verification.")
 
+            def restartExplorer():
+                try:
+
+                    print("\nRestarting \"explorer.exe\"")
+
+                    subprocess.run(["taskkill", "/f", "/im", "explorer.exe"])
+                    subprocess.run(["explorer.exe"])
+
+                    print("Explorer started successfully.")
+
+                except Exception as e:
+                    print("restartExplorer failed! Whoops!\nError: ", str(e))
+
             if ctypes.windll.shell32.IsUserAnAdmin():
                 print("Script is running as administrator.")
 
@@ -91,18 +115,33 @@ if __name__ == "__main__":
                         return False
             
                 if not keySearch():
-                    print("Creating key \".pcmac\" with subkeys")
+
+                    print("\nCreating keys")
 
                     ext_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ".pcmac")
                     winreg.SetValueEx(ext_key, None, 0, winreg.REG_SZ, "RePCC_File")
                     winreg.CloseKey(ext_key)
 
+                    print("    > Created extension key \".pcmac\" and closed key")
+
                     progid_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, "RePCC_File")
                     winreg.SetValueEx(progid_key, None, 0, winreg.REG_SZ, "RePCC File")
 
-                    icon_key = winreg.CreateKey(progid_key, "DefaultIcon")
+                    print("    > Created program id key \"RePCC_File\"")
 
-                    # TODO: Finish REGEDIT integration
+                    icon_key = winreg.CreateKey(progid_key, "DefaultIcon")
+                    winreg.SetValueEx(icon_key, None, 0, winreg.REG_SZ, MACDATA+"\\assets\\script.ico")
+
+                    print("        > Created subkey \"Default\"")
+
+                    winreg.CloseKey(icon_key)
+                    print("* Closed icon key")
+                    winreg.CloseKey(progid_key)
+                    print("* Closed program id key")
+
+                    restartExplorer()
+                else:
+                    print("Key \".pcmac\" exsists.")
             else:
                 print("Script is not running as administrator. Can not complete registry verification.")
 
@@ -110,7 +149,7 @@ if __name__ == "__main__":
         print("------------------------------------")
 
         versionVerification()
-        #regVerification()
+        regVerification()
 
         print("------------------------------------")
 
