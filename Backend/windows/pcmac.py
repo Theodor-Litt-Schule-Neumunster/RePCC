@@ -7,6 +7,10 @@ import ctypes
 import winreg
 import subprocess
 
+from pyfiglet import figlet_format
+
+
+
 APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
@@ -18,7 +22,9 @@ if __name__ == "__main__":
     def init():
         os.system("cls")
 
-        print("init says \"Hello World!\"")
+        print("\n")
+        print(figlet_format("RePCC", font="slant"))
+        print("\ninit says \"Hello World!\"")
 
         # Reference to how the folders are build, ver 0.15
         filestructure = {
