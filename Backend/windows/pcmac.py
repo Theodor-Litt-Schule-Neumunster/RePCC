@@ -5,11 +5,57 @@ import json
 import shutil
 import ctypes
 import winreg
+import argparse
 import subprocess
 
 from pyfiglet import figlet_format
 
+def main():
 
+    def saveMacro(JSONData:str, savedFileName:str):
+        try:
+            data = json.loads(JSONData)
+            print(data)
+            print(type(data))
+        except Exception as e:
+            print(e)
+
+    def initparser():
+        parser = argparse.ArgumentParser(
+            description="Reads or saves a macro",
+        )
+
+        parser.add_argument(
+            "-v", "--verbose",
+            action="store_true",
+            help="Makes the function EXTRA transparent",
+        )
+
+        parser.add_argument(
+            "-j", "--json",
+            type=str,
+            default="{0}",
+            help="JSON format as a string. Macro data in json",
+        )
+
+        parser.add_argument(
+            "-n", "--name",
+            type=str,
+            help="If save: saves macro with given name. If read: searches for macro with given name",
+        )
+
+        parser.add_argument(
+            "-m", "--mode",
+            choices=["save", "read"],
+            default="read",
+        )
+
+        return parser.parse_args()
+    
+    parser_args = initparser()
+
+    print(parser_args.mode)
+        
 
 APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 HEADER = ".RePCC"
@@ -160,3 +206,4 @@ if __name__ == "__main__":
         print("------------------------------------")
 
     #init()
+    main()
