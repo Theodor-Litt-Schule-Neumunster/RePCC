@@ -1,0 +1,69 @@
+{
+    "1":{
+        "type":"keyboard",
+        "actiontype":"singlekey",
+        "actiondata":["a"],
+        "sleep":100,
+        "presssleep":10
+    },
+    "2":{
+        "type":"keyboard",
+        "actiontype":"multikey",
+        "actiondata":["a", "b", "^C"],
+        "sleep":100,
+        "presssleep":10
+    },
+    "3":{
+        "type":"mouse",
+        "actiontype":"click",
+        "actiondata":[0],
+        "sleep":100,
+        "presssleep":10
+    },
+    "4":{
+        "type":"mouse",
+        "actiontype":"click",
+        "actiondata":[1],
+        "sleep":100,
+        "presssleep":10
+    },
+    "5":{
+        "type":"mouse",
+        "actiontype":"move",
+        "actiondata":[0.8,0.8],
+        "sleep":100,
+        "transition":"linear",
+        "transitiontime":500
+    },
+    "6":{
+        "type":"application",
+        "actiontype":"open",
+        "actiondata":["shell", "notepad"],
+        "sleep":100
+    },
+    "7":{
+        "type":"application",
+        "actiontype":"open",
+        "actiondata":["path", "C.\\PATH\\TO\\APP.exe"],
+        "sleep":100
+    },
+    "8":{
+        "type":"application",
+        "actiontype":"close",
+        "actiondata":["id", "6"],
+        "sleep":100
+    },
+    "9":{
+        "type":"application",
+        "actiontype":"close",
+        "actiondata":["id", "7"],
+        "sleep":100
+    },
+    "10":{
+        "type":"application",
+        "actiontype":"close",
+        "actiondata":["task", "explorer.exe"],
+        "sleep":100
+    }
+
+}
