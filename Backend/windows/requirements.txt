@@ -1,5 +1,6 @@
-fastapi[standard]
-fastapi
-uvicorn
-pyqt5
-pywin32
+fastapi==0.128.0
+pydantic==2.12.5
+pyfiglet==1.0.4
+PyQt5==5.15.11
+pywin32==311
+uvicorn==0.40.0

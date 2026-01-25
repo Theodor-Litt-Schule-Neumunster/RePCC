@@ -45,7 +45,7 @@ Mouse takes these values:
 - transition (IF MOVE)
     > The type of movement for the mouse. quadratic is smooth, linear is... linear!
     > Function for linear = M(t)=t
-    > Function for quadratic = M(t)=0.0016t^{4}-0.032t^{3}+0.16t^{2}
+    > Function for quadratic = M(t)=2t^2 - t^4 D=[0|1]
 - transitiontime (IF MOVE)
     > How long the mouse should be moved to the final desination in MS
 
@@ -59,3 +59,5 @@ Mouse takes these values:
     > You can close applications that were opened within the same macro with its step id. Or you can use the task name to kill it. Be careful though.
 - sleep
     > this is a int in MS that makes the macro wait that long untill it starts the action
+
+# 
