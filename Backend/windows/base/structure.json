@@ -36,28 +36,12 @@
         "transitiontime":500
     },
     "6":{
-        "type":"application",
-        "actiontype":"opentask",
-        "actiondata":["notepad.exe", "args"],
-        "sleep":100
-    },
-    "7":{
-        "type":"application",
-        "actiontype":"openpath",
-        "actiondata":["C:\\temp", "args"],
-        "sleep":100
-    },
-    "8":{
-        "type":"application",
-        "actiontype":"closeid",
-        "actiondata":[6],
-        "sleep":100
-    },
-    "9":{
-        "type":"application",
-        "actiontype":"closetask",
-        "actiondata":["explorer.exe"],
-        "sleep":100
+        "type":"mouse",
+        "actiontype":"move",
+        "actiondata":[0.1,0.1],
+        "sleep":100,
+        "transition":"linear",
+        "transitiontime":500
     }
 
 }

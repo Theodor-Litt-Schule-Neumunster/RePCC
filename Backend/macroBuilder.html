@@ -1,3 +1,5 @@
+<!--This is a very basic tool to make .pcmac files. It will not be included in the final product.-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,7 +27,7 @@
         font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
         font-size: 30pt;
         color: white;
-        background-color: aqua;
+        background-color: rgb(0, 0, 0);
         
         width: 100%;
     }
@@ -40,49 +42,161 @@
 
     .block{
         background-color: black;
-        width: 10%;
+        min-width: 15%;
+        min-height: 15%;
         aspect-ratio: 1/1;
         color: white;
         margin-left: auto;
         margin-right: auto;
     }
+    .blockhighlight{
+        background-color: white;
+        color: black;
+    }
 </style>
 
 <script>
 
+    function addMouse(mode) {
+        const blockArea = document.getElementById("blocks")
+        if (mode === "click") {
+            const buttonval = document.getElementById("buttininput").value
+            const sleepval = document.getElementById("buttonsleepinput").value
+            const pressval = document.getElementById("clicksleepinput").value
+
+            id = blockArea.children.length + 1
+
+            html = `
+            <div class="block" id=block`+ id + `>
+                <span class="blockhighlight">  `+ id + `</span> <span>mouse</span> <br>
+                <span>actiontype click</span> <br>
+                <span>actiondata [`+ buttonval + `]</span> <br>
+                <span>sleep `+ sleepval + `</span> <br>
+                <span>presssleep `+ pressval + `</span>
+            </div>
+            `
+
+            blockArea.innerHTML = blockArea.innerHTML + html
+            mouseBack()
+        }
+        if (mode === "move") {
+            const x = document.getElementById("mousemovex").value
+            const y = document.getElementById("mousemovey").value
+            const sleep = document.getElementById("mousemovesleep").value
+            const transition = document.getElementById("mousemovetransition").value
+            const transitiontime = document.getElementById("mousemovetransitiontime").value
+
+            id = blockArea.children.length + 1
+
+            html = `
+            <div class="block" id=block`+ id + `>
+                <span class="blockhighlight">  `+ id + `</span> <span>mouse</span> <br>
+                <span>actiontype move</span> <br>
+                <span>actiondata [`+ x + `, `+ y + `]</span> <br>
+                <span>sleep `+ sleep + `</span> <br>
+                <span>transition `+ transition + `</span>
+                <span>transitiontime `+ transitiontime + `</span>
+            </div>
+            `
+
+            blockArea.innerHTML = blockArea.innerHTML + html
+            mouseBack()
+        }
+    }
+
+    function mouseBack() {
+        body = document.getElementById("mousemodalbody")
+        body.innerHTML = `  
+
+        Select Mouse mode 
+        <button onclick="mouseModal_selectMode('move')" type="button" class="btn btn-danger">Move</button> 
+        <button onclick="mouseModal_selectMode('click')" type="button" class="btn btn-danger">Click</button>
+        
+        `
+    }
+    function mouseModal_selectMode(mode) {
+        body = document.getElementById("mousemodalbody")
+        if (mode === "click") {
+            htmlbody = `
+            
+                button: <input type="number" name="clickbtn" id="buttininput" min="0" max="1" placeholder="0"> (0 leftclick 1 rightclick)
+                <br>press length in ms <input type="number" name="sleep" id="clicksleepinput" placeholder="100">
+                <br>sleep in ms: <input type="number" name="sleep" id="buttonsleepinput" placeholder="100">
+                <br><br>
+                <button type="button" class="btn btn-secondary" onclick="mouseBack()">Back</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="addMouse('click')">Add</button>
+
+            `
+
+            body.innerHTML = htmlbody
+        } if (mode === "move") {
+            htmlbody = `
+                x: <input type="number" name="mousemovex" id="mousemovex" style="max-width: 10%;" placeholder="0.5">
+                y: <input type="number" name="mousemovey" id="mousemovey" style="max-width: 10%;" placeholder="0.5">
+                coordinates are normalized. (0.0 - 1.0)
+
+                <br>sleep <input type="number" name="mousemovesleep" id="mousemovesleep" placeholder="100">
+                <br>transitiontime <input type="number" name="mousemovetransitiontime" id="mousemovetransitiontime" placeholder="100">
+                <br>transition <select name="transitions" id="mousemovetransition">
+                    <option value="quadratic">smooth</option>
+                    <option value="linear">linear</option>
+                </select>
+                <br>
+                <button type="button" class="btn btn-secondary" onclick="mouseBack()">Back</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="addMouse('move')">Add</button>
+            `
+
+            body.innerHTML = htmlbody
+        }
+    }
 </script>
 
 <body>
+
     <div id="wrapper">
-        <div class="header"> PCMAC Builder </div>
+        <div class="header"> .PCMAC Builder </div>
         <div id="buildwrapper">
             <div id="controlpannel">
 
-                <button>Add Mouse</button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mouseModal">Add Mouse</button>
                 <button>Add Keyboard</button>
                 <button>Add Application</button>
+                <button>Export .pcmac</button>
 
             </div>
 
             <div id="blocks">
-                <div class="block">
+                <!-- <div class="block">
                     1 type <button>Delete</button> <br>
                     actiontype <br>
                     actiondata <br>
                     sleep 1 <br>
                     sleep 2
-                </div> 
-                <div class="block">
-                    1 type <button>Delete</button> <br>
-                    actiontype <br>
-                    actiondata <br>
-                    sleep 1 <br>
-                    sleep 2
-                </div> 
-                
+                </div> -->
             </div>
         </div>
     </div>
+
+
+<div>
+    <div class="modal fade" id="mouseModal" tabindex="-1" aria-labelledby="AddMouse" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h1 class="modal-title fs-5" id="exampleModalLabel">Add Mouse Event</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div id="mousemodalbody">
+                Select Mouse mode
+                <button onclick="mouseModal_selectMode('move')" type="button" class="btn btn-danger">Move</button> 
+                <button onclick="mouseModal_selectMode('click')" type="button" class="btn btn-danger">Click</button>
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+</div>
     
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>

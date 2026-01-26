@@ -197,30 +197,6 @@ ActionData value for click mouse is not correct.
 ActionData for move mouse is the wrong format.
    Should be: ['float', 'float']
    Is         {[type(val).__name__ for val in data["actiondata"]]}""")
-
-            if keytype == "application" and not (data["actiontype"] == "openpath" or data["actiontype"] == "closeid"):
-                if v: print("   * is application norm")
-
-                if not len(data["actiondata"]) == 1 and not len(data["actiondata"]) == 2:
-                    raise ValueError(f"""
-ActionData length for normal application is not correct.
-   Should be: 1 or 2
-   Is:        {len(data["actiondata"])}""")
-
-            if keytype == "application" and data["actiontype"] == "openpath":
-                if v: print("   * is application open path")
-
-                if not os.path.exists(data["actiondata"][0]):
-                    raise ValueError("""Path for application open path does not exsist.""")
-                
-            if keytype == "application" and data["actiontype"] == "closeid":
-                if v: print("   * is application close id")
-
-                if not data["actiondata"][0] > 0 or data["actiondata"][0] >= i:
-                    raise ValueError(f"""
-Close by ID value is outside of range.
-   Should be: x > 0 && x < {i}
-   Is:        {data["actiondata"][0]}""")
             
             if v: print("   > ActionData is OK.")
 
