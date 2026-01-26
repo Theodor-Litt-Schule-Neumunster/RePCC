@@ -167,10 +167,10 @@ Type for ActionData is incorrect.
             if keytype == "keyboard" and data["actiontype"] == "singlekey":
                 if v: print("   * is single key")
 
-                if not len(data["actiondata"]) == 1:
+                if not len(data["actiondata"]) >= 1:
                     raise ValueError(f"""
 ActionData length for singlekey keyboard is not correct.
-   Should be: 1
+   Should be: x>=1
    Is:        {len(data["actiondata"])}""")
 
             if keytype == "keyboard" and data["actiontype"] == "multikey":
@@ -314,61 +314,6 @@ Sleep is outside of range.
         :param v: Verbose
         :type v: bool
         """
-        # HELPERS
-
-        def _has_window_for_pid(pid:int) -> bool:
-
-            found = {"ok":False}
-
-            def _cb(hwnd, _):
-                if not win32gui.IsWindowVisible(hwnd):
-                    return True
-                _, wnd_pid = win32process.GetWindowThreadProcessId(hwnd)
-                if wnd_pid == pid:
-                    found["ok"] = True
-                    return False
-                return True
-            win32gui.EnumWindows(_cb, None)
-            return found["ok"]
-
-        def _launch_executable(path:str, args:list[str]|None = None, verify_timeout:float = 5.0):
-
-            cmd = [path] + (args or [])
-
-            try:
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    shell=False
-                )
-            except FileNotFoundError:
-                raise RuntimeError("Executable not found: " + path)
-            except OSError as e:
-                raise RuntimeError("Filed to start "+path+": "+str(e))
-            
-            time.sleep(.2)
-            if proc.poll() is not None and proc.returncode not in (None, 0):
-                raise RuntimeError("Process exited immediately with code "+str(proc.returncode))
-            
-            deadline = time.time() + verify_timeout
-            saw_window = False
-
-            while time.time() < deadline:
-                if _has_window_for_pid(proc.pid):
-                    saw_window = True
-                    break
-                if proc.poll() is not None:
-                    raise RuntimeError("Process exited with code"+str(proc.returncode))
-                
-            return proc, saw_window
-        
-        def _shell_open(path:str):
-            r = ctypes.windll.shell32.ShellExecuteW(None, "open", path, None, None, 1)
-            if r <= 32: # Shell returns < 32 if success
-                raise RuntimeError("Shell failed. Code: "+str(r))
-
-        # MAIN FUNCS
 
         def handler_mousemove(x_then:float, y_then:float, transitionTimeMS:float, transition:str):
             if v: print("\n  Is mouse move.")
@@ -445,17 +390,24 @@ Sleep is outside of range.
 
             if actiontype == "singlekey":
 
-                if v: print("  Single key press")
-                
-                key = keys[0].lower()
-                actual_key = SPECIAL_KEY_MAP.get(key, key)
+                if v: print("  Single key presses")
 
-                if v: print("    " + str(actual_key))
-
-                keyboard.press(actual_key) # type: ignore[attr-defined]
-                time.sleep(presssleep/1000)
-                keyboard.release(actual_key) # type: ignore[attr-defined]
+                for key in keys:
                 
+                    lowkey = key.lower() # haha
+                    actual_key = SPECIAL_KEY_MAP.get(key, key)
+
+                    if not key == actual_key:
+                        if key == key.upper():
+
+                            key = key.caps_lock
+
+                    if v: print("    " + str(actual_key))
+
+                    keyboard.press(actual_key) # type: ignore[attr-defined]
+                    time.sleep(presssleep/1000)
+                    keyboard.release(actual_key) # type: ignore[attr-defined]
+            
             if actiontype == "multikey":
                 if v: print("  Multi key press")
 
@@ -478,25 +430,6 @@ Sleep is outside of range.
                     keyboard.release(key)
                 
             print("   Keyboard press done.")
-
-        def handler_application(actiontype:str, appdata:list, sleep:int, step:int, registry:dict, v:bool):
-            if actiontype in ("openpath", "opentask"):
-                path = str(appdata[0]) 
-                args = [str(x) for x in appdata[1:]] if len(appdata) > 1 else None 
-
-                proc = None
-                window = None
-
-                if os.path.exists(path) and (path.lower().endswith(".exe") or os.path.isfile(path)):
-                    proc, window = _launch_executable(path, args)
-                else:
-                    _shell_open(path)
-
-                if proc:
-                    registry[step] = proc
-
-            if actiontype == "closeid":
-                ...
 
         try:
             macropath = MACDATA + "\\macros\\" + MacroName
@@ -533,8 +466,8 @@ Sleep is outside of range.
             print(e)
 
 macroHandler = macro()
-macroHandler.verifyStructure("./base/structure.json", True)
-#macroHandler.runMacro("testKeyboard.pcmac", True)
+#macroHandler.verifyStructure("./base/structure.json", True)
+macroHandler.runMacro("applicationTest.pcmac", True)
 
 if __name__ == "__main__":
 
