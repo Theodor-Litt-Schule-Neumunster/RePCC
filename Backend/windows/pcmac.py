@@ -13,9 +13,7 @@ import argparse
 import pyfiglet
 import win32api
 import win32con
-import win32gui
 import subprocess
-import win32process
 
 from pynput.keyboard import Controller, Key
 
@@ -467,7 +465,7 @@ Sleep is outside of range.
 
 macroHandler = macro()
 #macroHandler.verifyStructure("./base/structure.json", True)
-macroHandler.runMacro("applicationTest.pcmac", True)
+#macroHandler.runMacro("mouseTest.pcmac", True)
 
 if __name__ == "__main__":
 
@@ -705,6 +703,7 @@ if __name__ == "__main__":
                         data = f.read()
                         f.close()
 
+                    print(data)
                     return data # ... and return the contents
 
                 if not name in listdir: # ... and the name is not inside the macro directory...

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Macrobuilder</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+</head>
+<style>
+    body{
+        background-color: darkslategray;
+        margin: 0;
+    }
+
+    #wrapper{
+        display: flex;
+        width: 100%;
+        height: 100%;
+
+        flex-direction: column;
+    }
+
+    .header{
+        text-align: center;
+        font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        font-size: 30pt;
+        color: white;
+        background-color: aqua;
+        
+        width: 100%;
+    }
+
+    #blocks{
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        row-gap: 10px;
+        column-gap: 2px;
+    }
+
+    .block{
+        background-color: black;
+        width: 10%;
+        aspect-ratio: 1/1;
+        color: white;
+        margin-left: auto;
+        margin-right: auto;
+    }
+</style>
+
+<script>
+
+</script>
+
+<body>
+    <div id="wrapper">
+        <div class="header"> PCMAC Builder </div>
+        <div id="buildwrapper">
+            <div id="controlpannel">
+
+                <button>Add Mouse</button>
+                <button>Add Keyboard</button>
+                <button>Add Application</button>
+
+            </div>
+
+            <div id="blocks">
+                <div class="block">
+                    1 type <button>Delete</button> <br>
+                    actiontype <br>
+                    actiondata <br>
+                    sleep 1 <br>
+                    sleep 2
+                </div> 
+                <div class="block">
+                    1 type <button>Delete</button> <br>
+                    actiontype <br>
+                    actiondata <br>
+                    sleep 1 <br>
+                    sleep 2
+                </div> 
+                
+            </div>
+        </div>
+    </div>
+    
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+</body>
+</html>
