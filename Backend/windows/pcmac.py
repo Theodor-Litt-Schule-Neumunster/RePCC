@@ -202,10 +202,10 @@ ActionData for move mouse is the wrong format.
 
             if "presssleep" in req:
                 if v: print("   $ Checking PressSleep time...")
-                if not data["presssleep"] > 0:
+                if not data["presssleep"] >= 0:
                     raise ValueError(f"""
 PressSleep value is outside of range.
-   Should be: x > 0
+   Should be: x >= 0
    Is:        {data["presssleep"]}""")
 
                 if v: print("   > PressSleep is OK.")
@@ -219,20 +219,20 @@ Transition is not allowed.
    Should be: {allowedTransitions}
    Is:        {data["transition"]}""")
 
-                if not data["transitiontime"] > 0:
+                if not data["transitiontime"] >= 0:
                     raise ValueError(f"""
 TransitionTime is outside of range.
-   Should be: x > 0
+   Should be: x >= 0
    Is:        {data["transitiontime"]}""")
                 
                 if v: print("   > Transition values are OK.")
 
             if v: print("   $ Checking Sleep time...")
 
-            if not data["sleep"] > 0:
+            if not data["sleep"] >= 0:
                 raise ValueError(f"""
 Sleep is outside of range.
-   Should be: x > 0
+   Should be: x >= 0
    Is:        {data["sleep"]}""")
 
             if v: print("   > Sleep is OK.")
@@ -335,7 +335,7 @@ Sleep is outside of range.
 
                 win32api.SetCursorPos((x_new, y_new))
                 if i < steps:
-                    time.sleep(sleep_time+0.001)
+                    time.sleep(sleep_time+0.005)
 
         def handler_mouseclick(button:int, pressSleep:int):
 
@@ -440,8 +440,8 @@ Sleep is outside of range.
             print(e)
 
 macroHandler = macro()
-#macroHandler.verifyStructure("./base/structure.json", True)
-#macroHandler.runMacro("mouseTest.pcmac", True)
+#macroHandler.verifyStructure(f"{MACDATA}\\macros\\macro.pcmac", True)
+macroHandler.runMacro("macro.pcmac", True)
 
 if __name__ == "__main__":
 
