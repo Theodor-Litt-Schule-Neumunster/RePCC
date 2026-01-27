@@ -335,7 +335,7 @@ Sleep is outside of range.
 
                 win32api.SetCursorPos((x_new, y_new))
                 if i < steps:
-                    time.sleep(sleep_time)
+                    time.sleep(sleep_time+0.001)
 
         def handler_mouseclick(button:int, pressSleep:int):
 
@@ -345,13 +345,13 @@ Sleep is outside of range.
             if button == 0:
                 if v: print("  Click is left mouse button")
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0,0)
-                time.sleep(pressSleep/1000)
+                time.sleep(pressSleep/1000+0.001)
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0,0)
 
             if button == 1:
                 if v: print("  Click is right mouse button")
                 win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0,0)
-                time.sleep(pressSleep/1000)
+                time.sleep(pressSleep/1000+0.001)
                 win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0,0)
 
             if v: print("  Mouse click finished.")
@@ -379,7 +379,7 @@ Sleep is outside of range.
                     if v: print("    " + str(actual_key))
 
                     keyboard.press(actual_key) # type: ignore[attr-defined]
-                    time.sleep(presssleep/1000)
+                    time.sleep(presssleep/1000+0.001)
                     keyboard.release(actual_key) # type: ignore[attr-defined]
             
             if actiontype == "multikey":
@@ -396,7 +396,7 @@ Sleep is outside of range.
 
                     keyboard.press(actual_key) # type: ignore[attr-defined]
 
-                time.sleep(presssleep/1000)
+                time.sleep(presssleep/1000+0.001)
 
                 if v: print("  Releasing all keys...")
 
@@ -421,7 +421,7 @@ Sleep is outside of range.
                 
                 if v: print("\nWaiting before executing next step...")
                 if v: print(str(data[step]["sleep"]/1000) + " seconds.")
-                time.sleep(data[step]["sleep"]/1000)
+                time.sleep(data[step]["sleep"]/1000+0.001)
                 
                 if data[step]["type"] == "mouse" and data[step]["actiontype"] == "move":
                     handler_mousemove(actiondata[0], actiondata[1], data[step]["transitiontime"], data[step]["transition"])
