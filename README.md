@@ -11,3 +11,8 @@ Entwicklung einer benutzerfreundlichen Android-App (mit Flutter) inklusive PC-Cl
   - Präsentations-Klicker (Nächste/Vorherige Folie)
   - Laserpointer als Overlay auf dem PC
 - Bildschirmspiegelung vom PC auf das Smartphone mittels WebRTC
+
+### Software \ Assets von Dritten
+
+- JetBrains Mono Font ([OFL LICENSE](./Fonts/OFL.txt))
+  > Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
