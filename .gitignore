@@ -3,3 +3,4 @@ __pycache__
 Backend/windows/build
 Backend/windows/dist
 Backend/windows/*.spec
+build/*
