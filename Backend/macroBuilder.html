@@ -56,11 +56,91 @@
 </style>
 
 <script>
+    function addKeyboard(mode) {
+        const blockArea = document.getElementById("blocks")
+
+        if (mode === "singlekey") {
+            const keyval = document.getElementById("singlekeyinput").value
+            const sleepval = document.getElementById("singlekeysleep").value
+            const pressval = document.getElementById("singlekeypresssleep").value
+
+            id = blockArea.children.length + 1
+
+            html = `
+            <div class="block" id=block`+ id + `>
+                <span class="blockhighlight">  `+ id + `</span> <span>keyboard</span> <br>
+                <span>actiontype singlekey</span> <br>
+                <span>actiondata [`+ keyval + `]</span> <br>
+                <span>sleep `+ sleepval + `</span> <br>
+                <span>presssleep `+ pressval + `</span>
+            </div>
+            `
+
+            blockArea.innerHTML = blockArea.innerHTML + html
+            keyboardBack()
+        } if (mode === "multikey") {
+            const keyval = document.getElementById("multikeyinput").value
+            const sleepval = document.getElementById("multikeysleep").value
+            const pressval = document.getElementById("multikeypresssleep").value
+
+            id = blockArea.children.length + 1
+
+            html = `
+            <div class="block" id=block`+ id + `>
+                <span class="blockhighlight">  `+ id + `</span> <span>keyboard</span> <br>
+                <span>actiontype multikey</span> <br>
+                <span>actiondata [`+ keyval + `]</span> <br>
+                <span>sleep `+ sleepval + `</span> <br>
+                <span>presssleep `+ pressval + `</span>
+            </div>
+            `
+
+            blockArea.innerHTML = blockArea.innerHTML + html
+            keyboardBack()
+        }
+    }
+
+    function keyboardBack() {
+        body = document.getElementById("keyboardmodalbody")
+
+        body.innerHTML = `
+
+        Select Keyboard mode
+        <button onclick="keyboardModal_selectMode('singlekey')" type="button" class="btn btn-danger">Single Key</button> 
+        <button onclick="keyboardModal_selectMode('multikey')" type="button" class="btn btn-danger">Multi Key</button>
+      
+        `
+    }
+    function keyboardModal_selectMode(mode) {
+        body = document.getElementById("keyboardmodalbody")
+
+        if (mode === "singlekey") {
+            body.innerHTML = `
+            
+                key: <input type="text" name="singlekeyinput" id="singlekeyinput" placeholder="A"> for multiple, seperate with spaces
+                <br>press length in ms <input type="number" name="sleep" id="singlekeypresssleep" placeholder="100">
+                <br>sleep in ms: <input type="number" name="sleep" id="singlekeysleep" placeholder="100">
+                <br><br>
+                <button type="button" class="btn btn-secondary" onclick="keyboardBack()">Back</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="addKeyboard('singlekey')">Add</button>
+
+            `
+        } if (mode === "multikey") {
+            body.innerHTML = `
+                keys: <input type="text" name="multikeyinput" id="multikeyinput" placeholder="CTRL ALT DELETE"> seperate keys with spaces
+                <br>press length in ms <input type="number" name="sleep" id="multikeypresssleep" placeholder="100">
+                <br>sleep in ms: <input type="number" name="sleep" id="multikeysleep" placeholder="100">
+                <br>
+                <button type="button" class="btn btn-secondary" onclick="keyboardBack()">Back</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="addKeyboard('multikey')">Add</button>
+            `
+        }
+    }
 
     function addMouse(mode) {
         const blockArea = document.getElementById("blocks")
         if (mode === "click") {
-            const buttonval = document.getElementById("buttininput").value
+            const buttonval = document.getElementById("buttoninput").value
             const sleepval = document.getElementById("buttonsleepinput").value
             const pressval = document.getElementById("clicksleepinput").value
 
@@ -80,6 +160,7 @@
             mouseBack()
         }
         if (mode === "move") {
+            mouseBack()
             const x = document.getElementById("mousemovex").value
             const y = document.getElementById("mousemovey").value
             const sleep = document.getElementById("mousemovesleep").value
@@ -149,6 +230,95 @@
             body.innerHTML = htmlbody
         }
     }
+
+    function exportPCMAC() {
+        const blockArea = document.getElementById("blocks")
+        const blocks = blockArea.children
+        const pcmacData = {}
+
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i]
+            const spans = block.querySelectorAll("span")
+            const id = i + 1
+            
+            let type = ""
+            let actiontype = ""
+            let actiondata = []
+            let sleep = 100
+            let presssleep = 10
+            let transition = ""
+            let transitiontime = 0
+
+            for (const span of spans) {
+                const text = span.textContent.trim()
+                
+                if (text === "keyboard" || text === "mouse") {
+                    type = text
+                }
+                if (text.startsWith("actiontype ")) {
+                    actiontype = text.replace("actiontype ", "")
+                }
+                if (text.startsWith("actiondata [")) {
+                    const dataStr = text.replace("actiondata [", "").replace("]", "")
+                    if (dataStr.includes(",")) {
+                        actiondata = dataStr.split(",").map(item => {
+                            const trimmed = item.trim()
+                            const num = parseFloat(trimmed)
+                            return isNaN(num) ? trimmed : num
+                        })
+                    } else {
+                        const trimmed = dataStr.trim()
+                        const num = parseFloat(trimmed)
+                        if (!isNaN(num)) {
+                            actiondata = [num]
+                        } else {
+                            actiondata = trimmed.split(" ").filter(k => k !== "")
+                        }
+                    }
+                }
+                if (text.startsWith("sleep ")) {
+                    sleep = parseInt(text.replace("sleep ", ""))
+                }
+                if (text.startsWith("presssleep ")) {
+                    presssleep = parseInt(text.replace("presssleep ", ""))
+                }
+                if (text.startsWith("transition ")) {
+                    transition = text.replace("transition ", "")
+                }
+                if (text.startsWith("transitiontime ")) {
+                    transitiontime = parseInt(text.replace("transitiontime ", ""))
+                }
+            }
+
+            const blockData = {
+                "type": type,
+                "actiontype": actiontype,
+                "actiondata": actiondata,
+                "sleep": sleep,
+                "presssleep": presssleep
+            }
+
+            if (type === "mouse" && actiontype === "move") {
+                blockData["transition"] = transition
+                blockData["transitiontime"] = transitiontime
+                delete blockData.presssleep
+            }
+
+            pcmacData[id.toString()] = blockData
+        }
+
+        const jsonString = JSON.stringify(pcmacData, null, 4)
+        const blob = new Blob([jsonString], { type: "application/json" })
+        const url = URL.createObjectURL(blob)
+        
+        const a = document.createElement("a")
+        a.href = url
+        a.download = "macro.pcmac"
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+    }
 </script>
 
 <body>
@@ -159,9 +329,8 @@
             <div id="controlpannel">
 
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mouseModal">Add Mouse</button>
-                <button>Add Keyboard</button>
-                <button>Add Application</button>
-                <button>Export .pcmac</button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#keyboardModal">Add Keyboard</button>
+                <button onclick="exportPCMAC()">Export .pcmac</button>
 
             </div>
 
@@ -191,6 +360,24 @@
                 Select Mouse mode
                 <button onclick="mouseModal_selectMode('move')" type="button" class="btn btn-danger">Move</button> 
                 <button onclick="mouseModal_selectMode('click')" type="button" class="btn btn-danger">Click</button>
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="modal fade" id="keyboardModal" tabindex="-1" aria-labelledby="AddKeyboard" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h1 class="modal-title fs-5" id="exampleModalLabel">Add Keyboard Event</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div id="keyboardmodalbody">
+                Select Keyboard mode
+                <button onclick="keyboardModal_selectMode('singlekey')" type="button" class="btn btn-danger">Single Key</button> 
+                <button onclick="keyboardModal_selectMode('multikey')" type="button" class="btn btn-danger">Multi Key</button>
             </div>
         </div>
         </div>
