@@ -117,7 +117,7 @@
         if (mode === "singlekey") {
             body.innerHTML = `
             
-                key: <input type="text" name="singlekeyinput" id="singlekeyinput" placeholder="A"> for multiple, seperate with spaces
+                key: <input type="text" name="singlekeyinput" id="singlekeyinput" placeholder="A"> for multiple, seperate with spaces (use space for space key)
                 <br>press length in ms <input type="number" name="sleep" id="singlekeypresssleep" placeholder="100">
                 <br>sleep in ms: <input type="number" name="sleep" id="singlekeysleep" placeholder="100">
                 <br><br>
@@ -127,7 +127,7 @@
             `
         } if (mode === "multikey") {
             body.innerHTML = `
-                keys: <input type="text" name="multikeyinput" id="multikeyinput" placeholder="CTRL ALT DELETE"> seperate keys with spaces
+                keys: <input type="text" name="multikeyinput" id="multikeyinput" placeholder="CTRL ALT DELETE"> seperate keys with spaces (use &lt;space&gt; for space key)
                 <br>press length in ms <input type="number" name="sleep" id="multikeypresssleep" placeholder="100">
                 <br>sleep in ms: <input type="number" name="sleep" id="multikeysleep" placeholder="100">
                 <br>
@@ -160,12 +160,11 @@
             mouseBack()
         }
         if (mode === "move") {
-            mouseBack()
-            const x = document.getElementById("mousemovex").value
-            const y = document.getElementById("mousemovey").value
-            const sleep = document.getElementById("mousemovesleep").value
-            const transition = document.getElementById("mousemovetransition").value
-            const transitiontime = document.getElementById("mousemovetransitiontime").value
+            let x = document.getElementById("mousemovex").value
+            let y = document.getElementById("mousemovey").value
+            let sleep = document.getElementById("mousemovesleep").value
+            let transition = document.getElementById("mousemovetransition").value
+            let transitiontime = document.getElementById("mousemovetransitiontime").value
 
             id = blockArea.children.length + 1
 
@@ -200,7 +199,7 @@
         if (mode === "click") {
             htmlbody = `
             
-                button: <input type="number" name="clickbtn" id="buttininput" min="0" max="1" placeholder="0"> (0 leftclick 1 rightclick)
+                button: <input type="number" name="clickbtn" id="buttoninput" min="0" max="1" placeholder="0"> (0 leftclick 1 rightclick)
                 <br>press length in ms <input type="number" name="sleep" id="clicksleepinput" placeholder="100">
                 <br>sleep in ms: <input type="number" name="sleep" id="buttonsleepinput" placeholder="100">
                 <br><br>
@@ -272,7 +271,15 @@
                         if (!isNaN(num)) {
                             actiondata = [num]
                         } else {
-                            actiondata = trimmed.split(" ").filter(k => k !== "")
+                            actiondata = []
+                            const tokens = trimmed.split(" ")
+                            for (let token of tokens) {
+                                if (token === "space") {
+                                    actiondata.push(" ")
+                                } else if (token !== "") {
+                                    actiondata.push(token)
+                                }
+                            }
                         }
                     }
                 }
