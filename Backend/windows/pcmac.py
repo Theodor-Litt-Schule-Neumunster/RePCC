@@ -379,7 +379,7 @@ Sleep is outside of range.
                     if v: print("    " + str(actual_key))
 
                     keyboard.press(actual_key) # type: ignore[attr-defined]
-                    time.sleep(presssleep/1000+0.001)
+                    time.sleep(presssleep/1000+0.002)
                     keyboard.release(actual_key) # type: ignore[attr-defined]
             
             if actiontype == "multikey":
@@ -396,7 +396,7 @@ Sleep is outside of range.
 
                     keyboard.press(actual_key) # type: ignore[attr-defined]
 
-                time.sleep(presssleep/1000+0.001)
+                time.sleep(presssleep/1000+0.002)
 
                 if v: print("  Releasing all keys...")
 
@@ -441,7 +441,7 @@ Sleep is outside of range.
 
 macroHandler = macro()
 #macroHandler.verifyStructure(f"{MACDATA}\\macros\\macro.pcmac", True)
-macroHandler.runMacro("macro.pcmac", True)
+macroHandler.runMacro("testApp.pcmac", True)
 
 if __name__ == "__main__":
 
@@ -615,8 +615,8 @@ if __name__ == "__main__":
             )
 
             parser.add_argument(
-                "-m", "--mode",
-                choices=["save", "read"],
+                "-m", "--mode", 
+                choices=["save", "read", "run"],
                 default="none",
             )
 
@@ -698,6 +698,15 @@ if __name__ == "__main__":
 
                 # TODO: Finish intigration of writing new macro
         
+        if args.mode == "run":
+
+            if args.name == "none":
+                print("Name must be set to run macro.")
+                return
+            
+            if not args.name == "none":
+                ...
+
         if args.mode == "none":
             print("Must have MODE set.")
 
