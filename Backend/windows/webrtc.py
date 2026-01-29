@@ -1,5 +1,7 @@
 import cv2
 import mss
+import json
+import time
 import uvicorn
 import asyncio
 import traceback
@@ -8,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
+from laser import StartLaserpointer, UpdateLaserpointer, ClearLaserpointer, LaserPos
 from aiohttp import web
 
 from pydantic import BaseModel
@@ -33,7 +36,7 @@ class RePCC_VideoStream(VideoStreamTrack):
         
         self.monitor_id = monitor_id
         self.sct = mss.mss()
-        self.fps = 30
+        self.fps = 24
         self.frame_count = 0
 
     async def recv(self):
@@ -42,10 +45,10 @@ class RePCC_VideoStream(VideoStreamTrack):
         monitor = self.sct.monitors[self.monitor_id]
         screenshot = self.sct.grab(monitor)
         frame = np.array(screenshot)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+        frame = cv2.resize(frame, (monitor["width"]//2, monitor["height"]//2))
 
         pts, time_base = await self.next_timestamp()
-        video_frame = VideoFrame.from_ndarray(frame, format="bgr24") # type: ignore[attr-defined]
+        video_frame = VideoFrame.from_ndarray(frame, format="bgra") # type: ignore[attr-defined]
         video_frame.pts = pts
         video_frame.time_base = time_base
 
@@ -60,10 +63,36 @@ async def offer(request: OfferRequest):
         pc = RTCPeerConnection()
         pcs.add(pc)
 
+        @pc.on("datachannel")
+        def on_datachannel(channel):
+            if channel.label == "laser":
+
+                print("Laser DC has been created.")
+
+                lastupdate = time.time()
+
+                @channel.on("message")
+                async def on_message(message):
+                    print("laser msg!")
+                    try:
+                        currenttime = time.time()
+                        if currenttime - lastupdate >= 1/30:
+                            currenttime = lastupdate
+                            data = json.loads(message)
+                            pos = LaserPos(x=data["x"], y=data["y"])
+                            await UpdateLaserpointer(pos=pos)
+                    except Exception as e:
+                        print("Error handling laserpos")
+                        print(e)
+
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
             print(f"Connection state: {pc.connectionState}")
-            if pc.connectionState == "failed" or pc.connectionState == "closed":
+            if pc.connectionState == "connected":
+                print("Starting pointer...")
+                await StartLaserpointer()
+            elif pc.connectionState == "failed" or pc.connectionState == "closed":
+                await ClearLaserpointer()
                 await pc.close()
                 pcs.discard(pc)
 
@@ -89,7 +118,6 @@ async def offer(request: OfferRequest):
         print(e)
         traceback.print_exc()
         return web.json_response({"error": str(e)}, status=500)
-
 
 if __name__ == "__main__":
     uvicorn.run(App, host="0.0.0.0", port=15249)

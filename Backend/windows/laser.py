@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, pyqtSignal
 import sys
 import time
 import threading
@@ -13,6 +13,7 @@ import win32con
 # globals
 overlay = None
 App = None # App basis: QT
+overlay_ready = threading.Event()
 
 class LaserPos(BaseModel):
     """
@@ -26,6 +27,9 @@ class LaserPos(BaseModel):
     y: float
 
 class LaserOverlay(QWidget):
+    # Signal to update position from any thread
+    positionUpdate = pyqtSignal(float, float)
+
     def __init__(self):
         super().__init__()
 
@@ -38,12 +42,43 @@ class LaserOverlay(QWidget):
         screen = QGuiApplication.primaryScreen().geometry() # type: ignore[attr-defined] 
         self.setGeometry(screen)
 
+        self.opacity = 0
+
+        self.inactivity_timer = QTimer(self)
+        self.inactivity_timer.setSingleShot(True)
+        self.inactivity_timer.timeout.connect(self.fadeout_start)
+
+        self.fadetimer = QTimer(self)
+        self.fadetimer.timeout.connect(self.fadeout_step)
+
         self.dot_x = screen.width() // 2
         self.dot_y = screen.height() // 2
+
+        self.positionUpdate.connect(self._updatePosInternal)
 
         # makes the cursor be able to click through the widget
         self.make_click_through()
         self.show()
+
+    
+    def fadeout_reset(self):
+        print("reset")
+        self.inactivity_timer.stop()
+        self.fadetimer.stop()
+        self.opacity = 1
+        self.inactivity_timer.start(100)
+        self.repaint()
+
+    def fadeout_start(self):
+        print("start")
+        self.fadetimer.start(50)
+
+    def fadeout_step(self):
+        self.opacity -= 0.05
+        if self.opacity <= 0:
+            self.opacity = 0
+            self.fadetimer.stop()
+        self.repaint()
 
     def make_click_through(self) -> None:
         """
@@ -69,6 +104,9 @@ class LaserOverlay(QWidget):
         :type a0: QPaintEvent
         """
 
+        if self.opacity <= 0:
+            return
+
         glowradius = 30
         coreradius = 8
 
@@ -79,9 +117,9 @@ class LaserOverlay(QWidget):
         painter.setPen(Qt.NoPen) # type: ignore[attr-defined]
 
         gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
-        gradient.setColorAt(0, QColor(255, 0, 0, 180))
-        gradient.setColorAt(.3, QColor(255, 50, 0, 120))
-        gradient.setColorAt(.6, QColor(255, 100, 0, 60))
+        gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
+        gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
+        gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
         gradient.setColorAt(1, QColor(255, 0, 0, 0))
 
         painter.setBrush(gradient)
@@ -89,38 +127,46 @@ class LaserOverlay(QWidget):
             glowradius * 2, glowradius * 2)
 
         coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
-        coregradient.setColorAt(0, QColor(255, 255, 255, 255))
-        coregradient.setColorAt(0.5, QColor(255, 100, 100, 240))
-        coregradient.setColorAt(1, QColor(255, 0, 0, 200))
+        coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
+        coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
+        coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
 
         painter.setBrush(coregradient)
         painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
             coreradius * 2, coreradius * 2)
 
 
-    def updatePos(self, norm_x:float, norm_y:float) -> None:
-        """
-        Updates the laserpointer pos and re-draws the overlay.
-        
-        :param self:
-        :param norm_x: A number between 0 - 1 describing how far right the dot is on the screen.
-        :type norm_x: float
-        :param norm_y: A number between 0 - 1 describing how far down the dot is on the screen.
-        :type norm_y: float
-        """
+    @pyqtSlot(float, float)
+    def _updatePosInternal(self, norm_x: float, norm_y: float) -> None:
+        """Internal slot that runs on the Qt thread."""
         print("recieved pos update with data ", norm_x, norm_y)
         screen = QGuiApplication.primaryScreen().geometry() # type: ignore[attr-defined]
 
         self.dot_x = int(norm_x * screen.width())
         self.dot_y = int(norm_y * screen.height())
 
-        self.repaint() # New draw on screen.
+        self.fadeout_reset()
+        self.repaint()
+
+    def updatePos(self, norm_x:float, norm_y:float) -> None:
+        """
+        Updates the laserpointer pos and re-draws the overlay.
+        Thread-safe: can be called from any thread.
+        """
+        # Emit signal to ensure update happens on Qt thread
+        self.positionUpdate.emit(norm_x, norm_y)
 
 def _qt_loop():
     print("QT loop running.")
-    global App
+    global App, overlay
 
     App = QApplication(sys.argv)
+    
+    # Create overlay in the Qt thread
+    overlay = LaserOverlay()
+    print("IT STARTED!")
+    overlay_ready.set()  # Signal that overlay is ready
+    
     sys.exit(App.exec_())
     print("Sys exit.")
 
@@ -131,20 +177,21 @@ async def StartLaserpointer() -> tuple[bool, str]:
     :return: bool shows if execution was a success. str is appended message, e.g error.
     :rtype: tuple[bool, str]
     """
-    global overlay
+    global overlay, overlay_ready
 
     print("Starting laserpointer...")
 
     try:
         if overlay is None:
             print("Overlay none")
+            overlay_ready.clear()
             threading.Thread(target=_qt_loop, daemon=True).start()
 
-            import time
-            time.sleep(1)
-            print("Praying to god it starts...")
-            overlay = LaserOverlay()
-            print("IT STARTED!")
+            # Wait for overlay to be created (with timeout)
+            if not overlay_ready.wait(timeout=5):
+                return (False, "Timeout waiting for overlay to start")
+            
+            print("Overlay ready!")
         
         else:
             print("Laser is already running. Clear it before starting another.")
@@ -186,6 +233,8 @@ async def ClearLaserpointer() -> tuple[bool, str]:
     :rtype: tuple[bool, str]
     """
     global overlay
+
+    print("Killed")
 
     try:
         if overlay is not None:
