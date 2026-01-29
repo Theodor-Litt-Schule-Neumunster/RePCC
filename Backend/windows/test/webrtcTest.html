@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Test</title>
+</head>
+<body>
+    <h2>WebRTC Screen Test</h2>
+
+    <video id="video" autoplay playsinline style="width:80%; border:1px solid black;"></video>
+
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+
+    <p id="status">Not connected</p>
+
+    <script>
+        const BACKEND = "http://127.0.0.1:15248"
+        let pc = null
+        let dc = null
+
+        async function connect() {
+            pc = new RTCPeerConnection({ iceServers: []})
+        
+            pc.ontrack = (ev) => {
+                document.getElementById("video").srcObject = event.streams[0]
+                document.getElementById("status").textContent = "Video connected"
+            }
+
+            dc = pc.createDataChannel("input", {ordered : false})
+            dc.onopen = () => console.log("DC open")
+
+            const offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+
+            await new Promise(resolve => {
+                if (pc.iceGatheringState === "complete") resolve()
+                else pc.onicegatheringstatechange = () => {
+                    if (pc.iceGatheringState === "complete") resolve()
+                }
+            })
+
+            const response = await fetch(`${BACKEND}/webrtc/offer`,
+                {
+                    method: "POST",
+                    headers: {"Content-Type":"application/json"},
+                    body: JSON.stringify({sdp: pc.localDescription.sdp, type: "offer"})
+                }
+            )
+
+            const answer = await response.json()
+            await pc.setRemoteDescription(new RTCSessionDescription(answer))
+            
+            document.getElementById("status") = "Connected, awaiting video"
+        }
+
+        function disconnect() {
+            if (pc) pc.close()
+            pc = null
+
+            document.getElementById("video").srcObject = null
+            document.getElementById("status").textContent = "Disconnected"
+        }
+
+        // touch test
+        document.getElementById("video").onclick = (ev) => {
+            if (!dc || dc.readyState !== "open") return
+
+            const rect = e.target.getBoundingClientRect()
+            const x = (e.clientX - rect.left) / rect.width
+            const y = (e.clientY - rect.top) / rect.height
+
+            const buffer = new ArrayBuffer(9)
+            const view = new DataView(buffer)
+
+            view.setUint8(0, 0x02)
+            view.setFloat32(1, x, true)
+            view.setFloat32(5, y, true)
+
+            dc.send(buffer)
+            console.log("Send", x.toFixed(3), y.toFixed(3))
+        }
+    </script>
+</body>
+</html>

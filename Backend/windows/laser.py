@@ -1,8 +1,9 @@
 from pydantic import BaseModel
 from PyQt5.QtWidgets import QApplication, QWidget
-from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent
+from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
 from PyQt5.QtCore import Qt
 import sys
+import time
 import threading
 import win32gui
 import win32con
@@ -68,13 +69,33 @@ class LaserOverlay(QWidget):
         :type a0: QPaintEvent
         """
 
+        glowradius = 30
+        coreradius = 8
+
         print("Paintevent triggered.")
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
         painter.setPen(Qt.NoPen) # type: ignore[attr-defined]
-        painter.setBrush(QColor(255,0,0,220))
-        painter.drawEllipse(self.dot_x - 9, self.dot_y - 9, 18, 18)
+
+        gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
+        gradient.setColorAt(0, QColor(255, 0, 0, 180))
+        gradient.setColorAt(.3, QColor(255, 50, 0, 120))
+        gradient.setColorAt(.6, QColor(255, 100, 0, 60))
+        gradient.setColorAt(1, QColor(255, 0, 0, 0))
+
+        painter.setBrush(gradient)
+        painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
+            glowradius * 2, glowradius * 2)
+
+        coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
+        coregradient.setColorAt(0, QColor(255, 255, 255, 255))
+        coregradient.setColorAt(0.5, QColor(255, 100, 100, 240))
+        coregradient.setColorAt(1, QColor(255, 0, 0, 200))
+
+        painter.setBrush(coregradient)
+        painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
+            coreradius * 2, coreradius * 2)
 
 
     def updatePos(self, norm_x:float, norm_y:float) -> None:
