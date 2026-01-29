@@ -441,7 +441,7 @@ Sleep is outside of range.
 
 macroHandler = macro()
 #macroHandler.verifyStructure(f"{MACDATA}\\macros\\macro.pcmac", True)
-macroHandler.runMacro("testApp.pcmac", True)
+macroHandler.runMacro("mouseTest.pcmac", True)
 
 if __name__ == "__main__":
 
