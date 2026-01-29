@@ -45,16 +45,23 @@
     <div id="status">Disconnected</div>
 
     <script>
-        let pc = null;
+        let pc = null
+        let dc = null
+
+        let lastupdate = 0
 
         async function connect() {
             const serverUrl = document.getElementById('serverUrl').value;
             const status = document.getElementById('status');
             
             try {
-                status.textContent = 'Connecting...';
+                status.textContent = 'Connecting...'
                 
                 pc = new RTCPeerConnection();
+
+                dc = pc.createDataChannel("laser")
+                dc.onopen = () => console.log("laser dc open")
+                dc.onclose = () => console.log("laser dc closed")
 
                 // Add transceiver for receiving video
                 pc.addTransceiver('video', { direction: 'recvonly' });
@@ -69,7 +76,6 @@
                 };
 
                 const offer = await pc.createOffer();
-                console.log('Offer SDP:', offer.sdp);
                 await pc.setLocalDescription(offer);
 
                 const response = await fetch(serverUrl + '/offer', {
@@ -94,6 +100,42 @@
                 console.error(error);
             }
         }
+
+        document.addEventListener("DOMContentLoaded", () => {
+
+            const videoArea = document.querySelector("video")
+
+            videoArea.addEventListener("mousedown", (MD_ev) => {
+
+                console.log("DOWN!")
+
+                function mouseUpEvent(ev) {
+                    console.log("UP!")
+
+                    videoArea.removeEventListener("mousemove", mouseMoveEvent)
+                    document.removeEventListener("mouseup", mouseUpEvent)
+                }
+
+                function mouseMoveEvent(ev) {
+                    if (dc && dc.readyState === "open") {
+                        const now = performance.now()
+
+                        if (now - lastupdate >= 1000/30) {
+                            lastupdate = now
+                            const rect = videoArea.getBoundingClientRect()
+                            const x = (ev.clientX - rect.left) / rect.width
+                            const y = (ev.clientY - rect.top) / rect.height
+                            dc.send(JSON.stringify({x:x,y:y}))
+                            console.log(x, y)
+                        }
+                    }
+                }
+                mouseMoveEvent(MD_ev)
+
+                videoArea.addEventListener("mousemove", mouseMoveEvent)
+                document.addEventListener("mouseup", mouseUpEvent)
+            })
+        })
     </script>
 </body>
 </html>
