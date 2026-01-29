@@ -14,5 +14,5 @@ Entwicklung einer benutzerfreundlichen Android-App (mit Flutter) inklusive PC-Cl
 
 ### Software \ Assets von Dritten
 
-- JetBrains Mono Font ([OFL LICENSE](./Fonts/OFL.txt))
+- JetBrains Mono Font ([OFL LICENSE](./App/repcc_android/Fonts/OFL.txt))
   > Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
