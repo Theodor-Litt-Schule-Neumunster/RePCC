@@ -1,85 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebRTC Test</title>
+    <title>RePCC WebRTC Screen Share</title>
+    <style>
+        body {
+            font-family: Arial;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: #222;
+            color: white;
+        }
+        video {
+            width: 90%;
+            max-width: 1200px;
+            border: 2px solid #444;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #aaa;
+        }
+    </style>
 </head>
 <body>
-    <h2>WebRTC Screen Test</h2>
-
-    <video id="video" autoplay playsinline style="width:80%; border:1px solid black;"></video>
-
+    <h1>RePCC Screen Share</h1>
+    <input type="text" id="serverUrl" value="http://127.0.0.1:15249" placeholder="Server URL">
     <button onclick="connect()">Connect</button>
-    <button onclick="disconnect()">Disconnect</button>
-
-    <p id="status">Not connected</p>
+    <video autoplay playsinline></video>
+    <div id="status">Disconnected</div>
 
     <script>
-        const BACKEND = "http://127.0.0.1:15248"
-        let pc = null
-        let dc = null
+        let pc = null;
 
         async function connect() {
-            pc = new RTCPeerConnection({ iceServers: []})
-        
-            pc.ontrack = (ev) => {
-                document.getElementById("video").srcObject = event.streams[0]
-                document.getElementById("status").textContent = "Video connected"
-            }
-
-            dc = pc.createDataChannel("input", {ordered : false})
-            dc.onopen = () => console.log("DC open")
-
-            const offer = await pc.createOffer()
-            await pc.setLocalDescription(offer)
-
-            await new Promise(resolve => {
-                if (pc.iceGatheringState === "complete") resolve()
-                else pc.onicegatheringstatechange = () => {
-                    if (pc.iceGatheringState === "complete") resolve()
-                }
-            })
-
-            const response = await fetch(`${BACKEND}/webrtc/offer`,
-                {
-                    method: "POST",
-                    headers: {"Content-Type":"application/json"},
-                    body: JSON.stringify({sdp: pc.localDescription.sdp, type: "offer"})
-                }
-            )
-
-            const answer = await response.json()
-            await pc.setRemoteDescription(new RTCSessionDescription(answer))
+            const serverUrl = document.getElementById('serverUrl').value;
+            const status = document.getElementById('status');
             
-            document.getElementById("status") = "Connected, awaiting video"
-        }
+            try {
+                status.textContent = 'Connecting...';
+                
+                pc = new RTCPeerConnection();
 
-        function disconnect() {
-            if (pc) pc.close()
-            pc = null
+                // Add transceiver for receiving video
+                pc.addTransceiver('video', { direction: 'recvonly' });
 
-            document.getElementById("video").srcObject = null
-            document.getElementById("status").textContent = "Disconnected"
-        }
+                pc.ontrack = (event) => {
+                    console.log('Received track:', event.track.kind);
+                    document.querySelector('video').srcObject = event.streams[0];
+                };
 
-        // touch test
-        document.getElementById("video").onclick = (ev) => {
-            if (!dc || dc.readyState !== "open") return
+                pc.onconnectionstatechange = () => {
+                    status.textContent = 'Connection: ' + pc.connectionState;
+                };
 
-            const rect = e.target.getBoundingClientRect()
-            const x = (e.clientX - rect.left) / rect.width
-            const y = (e.clientY - rect.top) / rect.height
+                const offer = await pc.createOffer();
+                console.log('Offer SDP:', offer.sdp);
+                await pc.setLocalDescription(offer);
 
-            const buffer = new ArrayBuffer(9)
-            const view = new DataView(buffer)
+                const response = await fetch(serverUrl + '/offer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        sdp: offer.sdp,
+                        type: offer.type
+                    })
+                });
 
-            view.setUint8(0, 0x02)
-            view.setFloat32(1, x, true)
-            view.setFloat32(5, y, true)
-
-            dc.send(buffer)
-            console.log("Send", x.toFixed(3), y.toFixed(3))
+                const answer = await response.json();
+                console.log('Answer SDP:', answer.sdp);
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: "answer",
+                    sdp: answer.sdp
+                }));
+                
+                status.textContent = 'Connected!';
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
         }
     </script>
 </body>

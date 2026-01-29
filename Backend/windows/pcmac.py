@@ -1,6 +1,6 @@
 #filever : 0.2 indev
 
-#pyinstaller cmdlet: pyinstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repcclogo.ico" pcmac.py
+#pyinstaller cmdlet: pyinstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repccBin.ico" pcmac.py
 
 import os
 import sys

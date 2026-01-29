@@ -1,21 +1,21 @@
 # imports
 
 import os
-#import fastapi     # unused for now
+import asyncio
 import uvicorn
+
+#import fastapi     # unused for now
 
 # --
 # from's
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from Backend.windows.test.webrtcTest import handle
 
 # --
 # custom imports
 import laser
-from laser import StartLaserpointer, UpdateLaserpointer, ClearLaserpointer
-from test.webrtcTest import handle_offer, WebRTCAnswer, set_touch_callback
+from laser import StartLaserpointer, UpdateLaserpointer, ClearLaserpointer, LaserPos
 # --
 
 os.system("cls")
@@ -36,9 +36,6 @@ App.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-def on_touch(event_type:int, x:float, y:float):
-    ...
 
 @App.get("/ping")
 async def root():
@@ -65,6 +62,7 @@ async def updatelaser(pos:laser.LaserPos) -> dict[str, str]:
     except Exception as e:
         print(e)
         return {"error":str(e)}
+
 
 if __name__ == "__main__":
     if os.name == "nt":
