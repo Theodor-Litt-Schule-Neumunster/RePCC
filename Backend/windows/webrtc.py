@@ -1,9 +1,12 @@
+import os
 import cv2
 import mss
 import json
 import time
+import yaml
 import uvicorn
 import asyncio
+import threading
 import traceback
 
 from fastapi import FastAPI
@@ -16,6 +19,11 @@ from aiohttp import web
 from pydantic import BaseModel
 
 from av import VideoFrame
+
+APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming\\.RePCC" # type: ignore[attr-defined]
+SETTINGS = APPDATA+"\\settings\\"
+
+VERBOSE = False
 
 App = FastAPI(debug=True)
 App.add_middleware(
@@ -33,19 +41,26 @@ class OfferRequest(BaseModel):
 class RePCC_VideoStream(VideoStreamTrack):
     def __init__(self, monitor_id:int = 1) -> None:
         super().__init__()
+
+        loaded_settings = yaml.safe_load(open(SETTINGS+"webrtc.yaml"))
+        self.loaded_settings = loaded_settings
+
+        fps = self.loaded_settings["video"].get("framerate", 24)
         
         self.monitor_id = monitor_id
         self.sct = mss.mss()
-        self.fps = 24
+        self.fps = int(fps)
         self.frame_count = 0
 
     async def recv(self):
         import numpy as np
 
+        qual = self.loaded_settings["video"].get("quality", 2)
+
         monitor = self.sct.monitors[self.monitor_id]
         screenshot = self.sct.grab(monitor)
         frame = np.array(screenshot)
-        frame = cv2.resize(frame, (monitor["width"]//2, monitor["height"]//2))
+        frame = cv2.resize(frame, (monitor["width"]//int(qual), monitor["height"]//int(qual)))
 
         pts, time_base = await self.next_timestamp()
         video_frame = VideoFrame.from_ndarray(frame, format="bgra") # type: ignore[attr-defined]
@@ -119,5 +134,9 @@ async def offer(request: OfferRequest):
         traceback.print_exc()
         return web.json_response({"error": str(e)}, status=500)
 
-if __name__ == "__main__":
+def _runWEBRTC():
+    print("rum")
     uvicorn.run(App, host="0.0.0.0", port=15249)
+
+def startWebRTCServer():
+    threading.Thread(target=_runWEBRTC, daemon=True).start()

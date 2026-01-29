@@ -10,22 +10,16 @@ import uvicorn
 # from's
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # --
 # custom imports
-import laser
-from laser import StartLaserpointer, UpdateLaserpointer, ClearLaserpointer, LaserPos
+
+from webrtc import startWebRTCServer
 # --
 
 os.system("cls")
-
-print("Imports")
-
-# Not used as of now. Will be used as a IP whitelist
-origins = [
-    "http://127.0.0.1:15248"
-]
 
 App = FastAPI(debug=True)
 
@@ -39,34 +33,16 @@ App.add_middleware(
 
 @App.get("/ping")
 async def root():
-    return {"message":"Success"}
+    return JSONResponse({"message":"Success"}, status_code=202)
 
-@App.post("/laser/start")
-async def startlaser() -> dict[str, str]:
-    try:
-        await StartLaserpointer()
-        return {"status":"laserpointer_start"}
-    except Exception as e:
-        print(e)
-        return {"error":str(e)}
-    
-@App.post("/laser/update")
-async def updatelaser(pos:laser.LaserPos) -> dict[str, str]:
-    try:
-        if laser.overlay is None:
-            print("overlay not avalible")
-            return {"error":"overlay not avalible"}
-        
-        await UpdateLaserpointer(pos) 
-        return {"status":"laserpointer_update_success"}
-    except Exception as e:
-        print(e)
-        return {"error":str(e)}
-
+    # TODO: Add Argparser for manual saving reading opening
+    # TODO: Add HTTP requests for saving reading opening
 
 if __name__ == "__main__":
+
+    startWebRTCServer()
+
     if os.name == "nt":
-        print("Running main")
-        uvicorn.run(App, host="127.0.0.1", port=15248)
+        uvicorn.run(App, host="0.0.0.0", port=15248)
     else:
         print("OS is not NTFS")
