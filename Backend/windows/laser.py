@@ -1,12 +1,15 @@
-from pydantic import BaseModel
-from PyQt5.QtWidgets import QApplication, QWidget
-from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
-from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, pyqtSignal
+import os
 import sys
-import time
+import yaml
 import threading
 import win32gui
 import win32con
+
+from pydantic import BaseModel
+from collections import deque
+from PyQt5.QtWidgets import QApplication, QWidget
+from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
+from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, pyqtSignal
 
 # this is so cool
 
@@ -14,6 +17,9 @@ import win32con
 overlay = None
 App = None # App basis: QT
 overlay_ready = threading.Event()
+
+APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming\\.RePCC" # type: ignore[attr-defined]
+SETTINGS = APPDATA+"\\settings\\"
 
 class LaserPos(BaseModel):
     """
@@ -35,6 +41,9 @@ class LaserOverlay(QWidget):
 
         # Frameless screen that always stays on top w. transparent bg
 
+        loaded_settings = yaml.safe_load(open(SETTINGS+"presentationTools.yaml"))
+        self.loaded_settings = loaded_settings
+
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool) # type: ignore[attr-defined]
         self.setAttribute(Qt.WA_TranslucentBackground) # type: ignore[attr-defined]
 
@@ -54,6 +63,8 @@ class LaserOverlay(QWidget):
         self.dot_x = screen.width() // 2
         self.dot_y = screen.height() // 2
 
+        self.trail = deque(maxlen=20)
+
         self.positionUpdate.connect(self._updatePosInternal)
 
         # makes the cursor be able to click through the widget
@@ -62,11 +73,14 @@ class LaserOverlay(QWidget):
 
     
     def fadeout_reset(self):
+
+        time = self.loaded_settings["laserpointer"].get("fadetime", 1000)
+
         print("reset")
         self.inactivity_timer.stop()
         self.fadetimer.stop()
         self.opacity = 1
-        self.inactivity_timer.start(100)
+        self.inactivity_timer.start(time)
         self.repaint()
 
     def fadeout_start(self):
@@ -110,31 +124,77 @@ class LaserOverlay(QWidget):
         glowradius = 30
         coreradius = 8
 
-        print("Paintevent triggered.")
+        style = self.loaded_settings["laserpointer"].get("style", "default")
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
         painter.setPen(Qt.NoPen) # type: ignore[attr-defined]
 
-        gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
-        gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
-        gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
-        gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
-        gradient.setColorAt(1, QColor(255, 0, 0, 0))
+        if style == "default":
 
-        painter.setBrush(gradient)
-        painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
-            glowradius * 2, glowradius * 2)
+            gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
+            gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
+            gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
+            gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
+            gradient.setColorAt(1, QColor(255, 0, 0, 0))
 
-        coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
-        coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
-        coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
-        coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
+            painter.setBrush(gradient)
+            painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
+                glowradius * 2, glowradius * 2)
 
-        painter.setBrush(coregradient)
-        painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
-            coreradius * 2, coreradius * 2)
+            coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
+            coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
+            coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
+            coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
 
+            painter.setBrush(coregradient)
+            painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
+                coreradius * 2, coreradius * 2)
+        
+        elif style == "trail":
+            for i, (tx, ty) in enumerate(reversed(list(self.trail))):
+                if i == 0:
+                    continue
+
+                trail_opacity = max(0, self.opacity * (1 - i / len(self.trail)))
+                trail_glowradius = max(0, glowradius * (1 - i / len(self.trail)) * 0.5)
+                
+                if trail_opacity <= 0 or trail_glowradius <= 0:
+                    continue
+
+                gradient = QRadialGradient(tx, ty, trail_glowradius)
+                gradient.setColorAt(0, QColor(255, 0, 0, int(180 * trail_opacity)))
+                gradient.setColorAt(.3, QColor(255, 50, 0, int(120 * trail_opacity)))
+                gradient.setColorAt(.6, QColor(255, 100, 0, int(60 * trail_opacity)))
+                gradient.setColorAt(1, QColor(255, 0, 0, 0))
+                painter.setBrush(gradient)
+                painter.drawEllipse(int(tx - trail_glowradius), int(ty - trail_glowradius),
+                    int(trail_glowradius * 2), int(trail_glowradius * 2)) 
+
+            gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
+            gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
+            gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
+            gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
+            gradient.setColorAt(1, QColor(255, 0, 0, 0))
+
+            painter.setBrush(gradient)
+            painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
+                glowradius * 2, glowradius * 2)
+
+            coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
+            coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
+            coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
+            coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
+            
+            painter.setBrush(coregradient)
+            painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
+                coreradius * 2, coreradius * 2)
+
+        elif style == "simple":
+            painter.setBrush(QColor(255, 0, 0, 255))
+            painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
+                coreradius * 2, coreradius * 2)
 
     @pyqtSlot(float, float)
     def _updatePosInternal(self, norm_x: float, norm_y: float) -> None:
@@ -144,6 +204,8 @@ class LaserOverlay(QWidget):
 
         self.dot_x = int(norm_x * screen.width())
         self.dot_y = int(norm_y * screen.height())
+
+        self.trail.append((self.dot_x, self.dot_y))
 
         self.fadeout_reset()
         self.repaint()
