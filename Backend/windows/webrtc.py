@@ -4,10 +4,11 @@ import mss
 import json
 import time
 import yaml
+import logging
 import uvicorn
 import asyncio
 import threading
-import traceback
+import logging.config
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,10 @@ from aiohttp import web
 from pydantic import BaseModel
 
 from av import VideoFrame
+from args import LOGGER_CONF, customerror
+
+logging.config.dictConfig(LOGGER_CONF)
+logger = logging.getLogger("RePCC")
 
 APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming\\.RePCC" # type: ignore[attr-defined]
 SETTINGS = APPDATA+"\\settings\\"
@@ -39,7 +44,7 @@ class OfferRequest(BaseModel):
     type: str
 
 class RePCC_VideoStream(VideoStreamTrack):
-    def __init__(self, monitor_id:int = 1) -> None:
+    def __init__(self, monitor_id:int = 0) -> None:
         super().__init__()
 
         loaded_settings = yaml.safe_load(open(SETTINGS+"webrtc.yaml"))
@@ -51,6 +56,8 @@ class RePCC_VideoStream(VideoStreamTrack):
         self.sct = mss.mss()
         self.fps = int(fps)
         self.frame_count = 0
+
+        if self.monitor_id == 0: self.monitor_id = loaded_settings["video"].get("monitor", 1)
 
     async def recv(self):
         import numpy as np
@@ -82,13 +89,12 @@ async def offer(request: OfferRequest):
         def on_datachannel(channel):
             if channel.label == "laser":
 
-                print("Laser DC has been created.")
+                logger.info(f"WebRTC | laser datachannel has been created.")
 
                 lastupdate = time.time()
 
                 @channel.on("message")
                 async def on_message(message):
-                    print("laser msg!")
                     try:
                         currenttime = time.time()
                         if currenttime - lastupdate >= 1/30:
@@ -97,21 +103,22 @@ async def offer(request: OfferRequest):
                             pos = LaserPos(x=data["x"], y=data["y"])
                             await UpdateLaserpointer(pos=pos)
                     except Exception as e:
-                        print("Error handling laserpos")
-                        print(e)
+                        logger.error(f"WebRCT | ERROR @ webrct.py/offer/on_datachannel")
+                        logger.error(customerror("WebRTC", e))
 
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
-            print(f"Connection state: {pc.connectionState}")
             if pc.connectionState == "connected":
-                print("Starting pointer...")
+                logger.info(f"WebRTC | starting laserpointer...")
                 await StartLaserpointer()
+                logger.info(f"WebRTC | laserpointer started.")
             elif pc.connectionState == "failed" or pc.connectionState == "closed":
                 await ClearLaserpointer()
                 await pc.close()
                 pcs.discard(pc)
+                logger.info(f"WebRTC | Laserpointer cleared and closed PeerConnection")
 
-        video_stream = RePCC_VideoStream(monitor_id=2)
+        video_stream = RePCC_VideoStream()
         pc.addTrack(video_stream)
 
         await pc.setRemoteDescription(offer)
@@ -122,20 +129,18 @@ async def offer(request: OfferRequest):
         while pc.iceGatheringState != "complete":
             await asyncio.sleep(0.1)
 
-        print("Answer SDP:", pc.localDescription.sdp)
-
         return {
             "sdp": pc.localDescription.sdp,
             "type": pc.localDescription.type
         }
 
     except Exception as e:
-        print(e)
-        traceback.print_exc()
+        logger.error("WebRCT | ERROR @ webrct.py/offer")
+        logger.error(customerror("WebRCT", e))
         return web.json_response({"error": str(e)}, status=500)
 
 def _runWEBRTC():
-    print("rum")
+    logger.info("WebRTC server running.")
     uvicorn.run(App, host="0.0.0.0", port=15249)
 
 def startWebRTCServer():
