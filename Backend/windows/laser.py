@@ -1,9 +1,11 @@
 import os
 import sys
 import yaml
+import logging
 import threading
 import win32gui
 import win32con
+import logging.config
 
 from pydantic import BaseModel
 from collections import deque
@@ -11,9 +13,14 @@ from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
 from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, pyqtSignal
 
+from args import LOGGER_CONF, customerror
+
 # this is so cool
 
 # globals
+logging.config.dictConfig(LOGGER_CONF)
+logger = logging.getLogger("RePCC")
+
 overlay = None
 App = None # App basis: QT
 overlay_ready = threading.Event()
@@ -76,7 +83,6 @@ class LaserOverlay(QWidget):
 
         time = self.loaded_settings["laserpointer"].get("fadetime", 1000)
 
-        print("reset")
         self.inactivity_timer.stop()
         self.fadetimer.stop()
         self.opacity = 1
@@ -84,7 +90,6 @@ class LaserOverlay(QWidget):
         self.repaint()
 
     def fadeout_start(self):
-        print("start")
         self.fadetimer.start(50)
 
     def fadeout_step(self):
@@ -105,9 +110,9 @@ class LaserOverlay(QWidget):
             ex_style |= win32con.WS_EX_LAYERED | win32con.WS_EX_TRANSPARENT
             win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
 
-            print("Clickthrough OK")
         except Exception as e:
-            print("Error at make_click_through, ", e)
+            logger.error("Laser | ERROR @ laser.py/LaserOverlay/make_click_through")
+            logger.error(customerror("Laser", e))
     
     def paintEvent(self, a0:QPaintEvent) -> None: # type: ignore[attr-defined]
         """
@@ -199,7 +204,6 @@ class LaserOverlay(QWidget):
     @pyqtSlot(float, float)
     def _updatePosInternal(self, norm_x: float, norm_y: float) -> None:
         """Internal slot that runs on the Qt thread."""
-        print("recieved pos update with data ", norm_x, norm_y)
         screen = QGuiApplication.primaryScreen().geometry() # type: ignore[attr-defined]
 
         self.dot_x = int(norm_x * screen.width())
@@ -226,11 +230,10 @@ def _qt_loop():
     
     # Create overlay in the Qt thread
     overlay = LaserOverlay()
-    print("IT STARTED!")
+    logger.debug("Laser | Overlay started successfully.")
     overlay_ready.set()  # Signal that overlay is ready
     
     sys.exit(App.exec_())
-    print("Sys exit.")
 
 async def StartLaserpointer() -> tuple[bool, str]:
     """
@@ -241,7 +244,7 @@ async def StartLaserpointer() -> tuple[bool, str]:
     """
     global overlay, overlay_ready
 
-    print("Starting laserpointer...")
+    logger.debug("Laser | Starting overlay...")
 
     try:
         if overlay is None:
@@ -252,11 +255,9 @@ async def StartLaserpointer() -> tuple[bool, str]:
             # Wait for overlay to be created (with timeout)
             if not overlay_ready.wait(timeout=5):
                 return (False, "Timeout waiting for overlay to start")
-            
-            print("Overlay ready!")
         
         else:
-            print("Laser is already running. Clear it before starting another.")
+            logger.debug("Laser | Can only run one overlay at a time.")
 
         return (True, "Great success!")
     except Exception as e:
@@ -274,8 +275,6 @@ async def UpdateLaserpointer(pos: LaserPos) -> tuple[bool, str]:
     """
     global overlay
 
-    print("updating overlay")
-
     try:
         if overlay is None:
             print("not ready")
@@ -284,7 +283,8 @@ async def UpdateLaserpointer(pos: LaserPos) -> tuple[bool, str]:
         overlay.updatePos(pos.x, pos.y)
         return (True, "Position updates successfully.")
     except Exception as e:
-        print(e)
+        logger.error("Laser | ERROR @ laser.py/UpdateLaserpointer")
+        logger.error(customerror("Laser", e))
         return (False, str(e))
     
 async def ClearLaserpointer() -> tuple[bool, str]:
@@ -296,7 +296,7 @@ async def ClearLaserpointer() -> tuple[bool, str]:
     """
     global overlay
 
-    print("Killed")
+    logger.debug("Laser | Killed overlay.")
 
     try:
         if overlay is not None:
@@ -305,5 +305,6 @@ async def ClearLaserpointer() -> tuple[bool, str]:
 
         return (True, "Overlay cleared.")
     except Exception as e:
-        print(e)
+        logger.error("Laser | ERROR @ laser.py/ClearLaserpointer")
+        logger.error(customerror("Laser", e))
         return (False, str(e))
