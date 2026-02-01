@@ -1,0 +1,15 @@
+aiohttp==3.13.3
+aiortc==1.14.0
+av==16.1.0
+fastapi==0.128.0
+mss==10.1.0
+numpy==2.4.2
+opencv_python==4.13.0.90
+pydantic==2.12.5
+pynput==1.8.1
+PyQt5==5.15.11
+pyqt5_sip==12.18.0
+pywin32==311
+PyYAML==6.0.3
+uvicorn==0.40.0
+zeroconf==0.148.0

@@ -12,7 +12,7 @@ RANDOM_ERROR_LIST = [
     "Just pretend this never happened...",
     "The script overslept.",
     "Uh oh.",
-    "We are not getting out of the streets with this code!! 🗣️🗣️🗣️🗣️",
+    "We are not getting out of the streets with this code!",
     "Git commit -m \"... hmm...",
     "Congrats! You found this before Copilot did!",
     "Erm... Cursor! Fix this!",
