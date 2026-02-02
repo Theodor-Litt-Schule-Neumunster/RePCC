@@ -21,7 +21,7 @@ from zeroconf import Zeroconf, ServiceInfo
 # --
 # custom imports
 
-from args import LOGGER_CONF, customerror
+from args import LOGGER_CONF, customerror, forceLogFolder
 from pcmac import initializePCMAC
 from webrtc import startWebRTCServer
 # --
@@ -36,8 +36,11 @@ def NEW2FA():
 
 NEW2FA()
 
-logging.config.dictConfig(LOGGER_CONF)
-logger = logging.getLogger("RePCC")
+try:
+    logging.config.dictConfig(LOGGER_CONF)
+    logger = logging.getLogger("RePCC")
+except Exception as e:
+    logger = forceLogFolder()
 
 os.system("cls")
 App = FastAPI(debug=True)
@@ -51,16 +54,26 @@ App.add_middleware(
 
 @App.get("/ping")
 async def ping(request:Request):
+
+    macsYaml = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
+
+    if not macsYaml["IP"] == None:
+        if request.client.host in macsYaml["IP"]:
+            return JSONResponse({"message":"Success"}, status_code=202)
+
     logger.info(f"main | Recieved ping from {request.client.host}. Responding with OK") # type: ignore[attr-defined]
-    return JSONResponse({"message":"Success"}, status_code=202)
+    return JSONResponse({"message":"Success"}, status_code=200)
 
     # TODO: Add Argparser for manual saving reading opening
     # TODO: Add HTTP requests for saving reading opening
 
-#--------------- mDNS AUTO PAIRING
+#   --------------- mDNS AUTO PAIRING
 
 @App.post("/connect")
 async def repccConnect(request:Request):
+
+    # TODO: 'NoneType' object has no attribute 'append', FIX THISSSSSS!!!!!!!!!!!!!!!!!!!
+
     print("Request to connect")
     logger.debug(f"main | Recieving new request to connect by {request.client.host}") # type: ignore[attr-defined]
 
@@ -68,19 +81,34 @@ async def repccConnect(request:Request):
     print(data)
     
     macsYAML = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
-    print(macsYAML)
 
-    def pair(mac:str, macsYAML:dict):
+    def pair(mac:str, ip:str, macsYAML:dict):
 
         macsYAML = macsYAML["MAC"].append(mac)
+
+        if not macsYAML["IP"] == None:
+            if not ip in macsYAML["IP"]:
+                macsYAML = macsYAML["IP"].append(ip)
+        else: macsYAML = macsYAML["IP"].append(ip)
+
         yaml.safe_dump(macsYAML, open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
+        print("dump")
         return
 
     try:
-        if macsYAML["MAC"] == None:
-            if data["2fa"] == TWOFACODE:
+        if int(data["2fa"]) == TWOFACODE:
 
-                NEW2FA()
+            print("2FA OK")
+
+            NEW2FA()
+            pair(data["mac"], request.client.host, macsYAML)
+            return JSONResponse({"message":"Accepted and paired."}, status_code=200)
+        
+        if not macsYAML["MAC"] == None:
+            if data["mac"] in macsYAML["MAC"]:
+                return JSONResponse({"message":"Accepted"}, status_code=200)
+            
+        return ValueError("2fa mismatch & no entry in connected MACs")
 
     except Exception as e:
         print(e)

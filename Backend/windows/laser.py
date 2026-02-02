@@ -13,13 +13,16 @@ from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
 from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, pyqtSignal
 
-from args import LOGGER_CONF, customerror
+from args import LOGGER_CONF, customerror, forceLogFolder
 
 # this is so cool
 
 # globals
-logging.config.dictConfig(LOGGER_CONF)
-logger = logging.getLogger("RePCC")
+try:
+    logging.config.dictConfig(LOGGER_CONF)
+    logger = logging.getLogger("RePCC")
+except:
+    logger = forceLogFolder()
 
 overlay = None
 App = None # App basis: QT
