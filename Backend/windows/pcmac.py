@@ -28,7 +28,7 @@ APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # 
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
 
-FILEVER = "0.18"
+FILEVER = "0.185"
 SPECIAL_KEY_MAP = {
     'ctrl': Key.ctrl,
     'shift': Key.shift,
