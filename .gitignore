@@ -4,3 +4,7 @@ Backend/windows/build
 Backend/windows/dist
 Backend/windows/*.spec
 build/*
+App/repcc_android/macos/Flutter/GeneratedPluginRegistrant.swift
+App/repcc_android/windows/flutter/generated_plugin_registrant.cc
+App/repcc_android/windows/flutter/generated_plugin_registrant.h
+App/repcc_android/windows/flutter/generated_plugins.cmake
