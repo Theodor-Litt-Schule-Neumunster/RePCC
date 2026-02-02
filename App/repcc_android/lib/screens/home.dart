@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../models/device.dart';
 import 'connect.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  // List of devices managed by the state
+  List<Device> devices = [
+    Device(id: '1', name: 'Device 1', isConnected: true),
+    Device(id: '2', name: 'Device 2', isConnected: false),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -22,56 +34,83 @@ class HomeScreen extends StatelessWidget {
             children: [
               Text(
                 'Added Devices',
-                style: TextStyle(color: Colors.white, fontSize: 24),
+                style: TextStyle(color: Colors.white, fontSize: 24, fontFamily: 'JetBrainsMono'),
               ),
-              Card(
-                color: Color(0xFF252525),
-                child: ListTile(
-                  leading: SvgPicture.asset(
-                    'assets/Icons/computer_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                    colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                    width: 24,
-                    height: 24,
-                  ),
-                  title: Text(
-                    'Device 1',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  subtitle: Text(
-                    'Status: Connected',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-
+              Expanded(
+                child: ListView.builder(
+                  itemCount: devices.length,
+                  itemBuilder: (context, index) {
+                    return _buildDeviceCard(devices[index], () {
+                      setState(() {
+                        devices.removeAt(index);
+                      });
+                    });
+                  },
                 ),
               ),
-              Card(
-                color: Color(0xFF252525),
-                child: ListTile(
-                  leading: SvgPicture.asset(
-                    'assets/Icons/computer_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                    colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                    width: 24,
-                    height: 24,
-                  ),
-                  title: Text(
-                    'Device 2',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  subtitle: Text(
-                    'Status: Disconnected',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ),
-          )],
+            ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) =>  ConnectScreen()));
+        onPressed: () async {
+          // Wait for the result from the ConnectScreen
+          final newDevice = await Navigator.push(
+            context, 
+            MaterialPageRoute(builder: (context) =>  ConnectScreen())
+          );
+
+          // If a device was returned (not null), add it to the list
+          if (newDevice != null && newDevice is Device) {
+            setState(() {
+              devices.add(newDevice);
+            });
+          }
         },
-        icon: Icon(Icons.add),
+        icon: SvgPicture.asset('assets/Icons/add.svg',
+            colorFilter: ColorFilter.mode(Colors.black, BlendMode.srcIn),
+            width: 24,
+            height: 24),
         label: Text('Add Device')
+      ),
+    );
+  }
+
+  Widget _buildDeviceCard(Device device, VoidCallback onDelete) {
+    return Card(
+      color: device.isConnected ? Color(0xFF404040) : Color(0xFF202020),
+      child: ListTile(
+        leading: SvgPicture.asset(
+          'assets/Icons/computer.svg',
+          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          width: 24,
+          height: 24,
+        ),
+        title: Text(
+          device.name,
+          style: TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono', fontWeight: FontWeight.normal),
+        ),
+        subtitle: Text.rich(
+          TextSpan(
+            text: 'Status: ',
+            style: TextStyle(color: Colors.white70),
+            children: [
+              TextSpan(
+                text: device.isConnected ? 'Connected' : 'Disconnected',
+                style: TextStyle(color: device.isConnected ? Colors.green : Colors.white70),
+              ),
+            ],
+          ),
+        ),
+        trailing: IconButton(
+          onPressed: onDelete,
+          icon: SvgPicture.asset(
+            'assets/Icons/delete.svg',
+            colorFilter: ColorFilter.mode(Colors.white70, BlendMode.srcIn),
+            width: 24,
+            height: 24,
+          ),
+        ),
       ),
     );
   }
