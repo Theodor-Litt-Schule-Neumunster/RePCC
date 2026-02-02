@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class ConnectScreen extends StatelessWidget {
   const ConnectScreen({super.key});
@@ -20,7 +21,12 @@ class ConnectScreen extends StatelessWidget {
             ),
             FloatingActionButton(onPressed:   () {
               Navigator.pop(context);
-            }, child: Icon(Icons.arrow_back))
+            }, child: SvgPicture.asset(
+                    'assets/Icons/arrow_back.svg',
+                    width: 24,
+                    height: 24,
+                    colorFilter: ColorFilter.mode(Colors.black, BlendMode.srcIn), // Adjust color as needed, often FAB icons are black or white
+              ))
           ],
         ),
       ),
