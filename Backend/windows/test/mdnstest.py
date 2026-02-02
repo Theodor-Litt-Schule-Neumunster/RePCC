@@ -30,6 +30,7 @@ class TestListener(ServiceListener):
             twofa = props[b"2fa"].decode('utf-8') # type: ignore
 
             addr = f"http://{ip}:15248/connect"
+            print(props)
 
             r = requests.post(url=addr, json={
                 "mac":devicemac,

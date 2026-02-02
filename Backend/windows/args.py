@@ -67,7 +67,7 @@ LOGGER_CONF = {
 }
 
 def customerror(module:str, e):
-    return f"""{module} | {RANDOM_ERROR_LIST[random.randint(0, len(RANDOM_ERROR_LIST))]} - {e}"""
+    return f"""{module} | {RANDOM_ERROR_LIST[random.randint(0, len(RANDOM_ERROR_LIST)-1)]} - {e}"""
 
 def forceLogFolder():
     os.mkdir(ROAMING+"\\.RePCC\\logs")

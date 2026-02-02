@@ -58,7 +58,7 @@ async def ping(request:Request):
     macsYaml = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
 
     if not macsYaml["IP"] == None:
-        if request.client.host in macsYaml["IP"]:
+        if request.client.host in macsYaml["IP"]: # type: ignore[attr-defined]
             return JSONResponse({"message":"Success"}, status_code=202)
 
     logger.info(f"main | Recieved ping from {request.client.host}. Responding with OK") # type: ignore[attr-defined]
@@ -69,44 +69,55 @@ async def ping(request:Request):
 
 #   --------------- mDNS AUTO PAIRING
 
+MDNS = None
+SERVICEINFO = None
+
 @App.post("/connect")
 async def repccConnect(request:Request):
 
-    # TODO: 'NoneType' object has no attribute 'append', FIX THISSSSSS!!!!!!!!!!!!!!!!!!!
-
-    print("Request to connect")
     logger.debug(f"main | Recieving new request to connect by {request.client.host}") # type: ignore[attr-defined]
 
     data = await request.json()
-    print(data)
-    
     macsYAML = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
 
     def pair(mac:str, ip:str, macsYAML:dict):
 
-        macsYAML = macsYAML["MAC"].append(mac)
-
+        if not macsYAML["MAC"] == None:
+            macsYAML["MAC"].append(mac)
+        else: 
+            macsYAML["MAC"] = [mac] # type: ignore[attr-defined]
         if not macsYAML["IP"] == None:
-            if not ip in macsYAML["IP"]:
-                macsYAML = macsYAML["IP"].append(ip)
-        else: macsYAML = macsYAML["IP"].append(ip)
-
-        yaml.safe_dump(macsYAML, open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
-        print("dump")
+            if not mac in macsYAML["IP"]:
+                macsYAML["IP"][mac] = ip
+        else: 
+            print("ip el")
+            macsYAML["IP"] = {str(mac) : str(ip)}
+            print(macsYAML)
+        yaml.safe_dump(macsYAML, open(ROAMING+"\\.RePCC\\settings\\register.yaml", "w"))
         return
 
     try:
-        if int(data["2fa"]) == TWOFACODE:
 
-            print("2FA OK")
-
-            NEW2FA()
-            pair(data["mac"], request.client.host, macsYAML)
-            return JSONResponse({"message":"Accepted and paired."}, status_code=200)
-        
         if not macsYAML["MAC"] == None:
             if data["mac"] in macsYAML["MAC"]:
+
+                print(":3")
+                
                 return JSONResponse({"message":"Accepted"}, status_code=200)
+
+        if int(data["2fa"]) == TWOFACODE:
+
+            NEW2FA()
+            
+            logger.debug("main | Connect request accepted. New 2FA requested.")
+            pair(data["mac"], request.client.host, macsYAML) # type: ignore[attr-defined]
+
+            if MDNS and SERVICEINFO:
+                SERVICEINFO.properties["2fa"] = str(TWOFACODE) # type: ignore[attr-defined]
+                MDNS.update_service(SERVICEINFO)
+                logger.debug("main | Updated mDNS service with new 2FA code")
+
+            return JSONResponse({"message":"Accepted and paired."}, status_code=200)
             
         return ValueError("2fa mismatch & no entry in connected MACs")
 
@@ -140,18 +151,19 @@ def registerMDNS(port:int = 15250):
 
     zc = Zeroconf()
     zc.register_service(serviceinfo)
-    return zc
+    return zc, serviceinfo
 
 if __name__ == "__main__":
+
 
     logger.info("\n\n--------------------START--------------------")
     logger.info("Wakey wakey eggs 'n bakey! Time to run!")
 
-    logger.info("main | Initializing mDNS")
-    mdns = registerMDNS()
-
     logger.info("main | Initializing .pcmac")
-    #initializePCMAC()
+    initializePCMAC()
+
+    logger.info("main | Initializing mDNS")
+    MDNS, SERVICEINFO = registerMDNS()
 
     #startWebRTCServer()
     logger.info(f"main | WebRTC server started.")
