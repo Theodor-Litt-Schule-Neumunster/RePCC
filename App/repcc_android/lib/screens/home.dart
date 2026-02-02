@@ -9,7 +9,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     const String appTitle = 'RePCC';
     return Scaffold(
-      backgroundColor: Color(0xFF151515),
+      backgroundColor: Color(0xFF353535),
       appBar: AppBar(
         backgroundColor: Color(0xFF121212),
         title: Center(child: Text(appTitle, style: TextStyle(color: Colors.white, fontSize: 35),)),
@@ -69,7 +69,8 @@ class HomeScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(context, MaterialPageRoute(builder: (context) =>  ConnectScreen()));
-        }, 
+        },
+        icon: Icon(Icons.add),
         label: Text('Add Device')
       ),
     );
