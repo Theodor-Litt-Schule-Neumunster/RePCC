@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'connect.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -26,7 +27,12 @@ class HomeScreen extends StatelessWidget {
               Card(
                 color: Color(0xFF252525),
                 child: ListTile(
-                  leading: Icon(Icons.devices, color: Colors.white),
+                  leading: SvgPicture.asset(
+                    'assets/Icons/computer_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
+                    colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                    width: 24,
+                    height: 24,
+                  ),
                   title: Text(
                     'Device 1',
                     style: TextStyle(color: Colors.white),
@@ -41,7 +47,12 @@ class HomeScreen extends StatelessWidget {
               Card(
                 color: Color(0xFF252525),
                 child: ListTile(
-                  leading: Icon(Icons.devices, color: Colors.white),
+                  leading: SvgPicture.asset(
+                    'assets/Icons/computer_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
+                    colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                    width: 24,
+                    height: 24,
+                  ),
                   title: Text(
                     'Device 2',
                     style: TextStyle(color: Colors.white),
