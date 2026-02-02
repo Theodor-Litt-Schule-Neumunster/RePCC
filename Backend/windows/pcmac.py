@@ -16,10 +16,13 @@ import subprocess
 import logging.config
 
 from pynput.keyboard import Controller, Key
-from args import LOGGER_CONF, customerror
+from args import LOGGER_CONF, customerror, forceLogFolder
 
-logging.config.dictConfig(LOGGER_CONF)
-logger = logging.getLogger("RePCC")
+try:
+    logging.config.dictConfig(LOGGER_CONF)
+    logger = logging.getLogger("RePCC")
+except:
+    logger = forceLogFolder()
 
 APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 HEADER = ".RePCC"
@@ -511,3 +514,6 @@ def initializePCMAC(v:bool=False):
     logger.info(f"pcmac | Current filestructure version: {str(FILEVER)}")
     versionVerification()
     regVerification()
+
+if __name__ == "__main__":
+    initializePCMAC()
