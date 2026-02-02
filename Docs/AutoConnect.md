@@ -44,6 +44,6 @@ Address:    `192.168.0.1:15248/connect`
 
 Body:       `{"MAC":"AN:NY:MA:C0:AD:DR:ES", "2fa":123456789}`
 
-Wenn der Server die verbindung annimmt und alle Information da sind, wird der server mit 202 (ACCEPTED) antworten. Der Server speichert die IP und brauch bei zukünftigen verbindungen keine 2FA. Diese verbundungen werden auch akzeptiert wenn neue verbindungen geblockt werden, solange die MAC-Adresse des Gerätes immer mitgeteielt wird.
+Wenn der Server die verbindung annimmt und alle Information da sind, wird der server mit 200 (ACCEPTED) antworten. Der Server speichert die IP und brauch bei zukünftigen verbindungen keine 2FA. Diese verbundungen werden auch akzeptiert wenn neue verbindungen geblockt werden, solange die MAC-Adresse des Gerätes immer mitgeteielt wird.
 
 Um eine komplette ausschließung von den Geräten zu gewährleisten, muss die gespeicherte MAC-Adresse gelöscht werden. 
