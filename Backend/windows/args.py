@@ -1,6 +1,9 @@
 import os
+import logging
 import random
+import logging.config
 
+ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 RANDOM_ERROR_LIST = [
     "Well... this is akward!",
     "50 / 50 chance this is your fault, or my coding.",
@@ -65,3 +68,13 @@ LOGGER_CONF = {
 
 def customerror(module:str, e):
     return f"""{module} | {RANDOM_ERROR_LIST[random.randint(0, len(RANDOM_ERROR_LIST))]} - {e}"""
+
+def forceLogFolder():
+    os.mkdir(ROAMING+"\\.RePCC\\logs")
+
+    logging.config.dictConfig(LOGGER_CONF)
+    logger = logging.getLogger("RePCC")
+
+    logger.debug("CONFIG | Log folder forefully created.")
+
+    return logger
