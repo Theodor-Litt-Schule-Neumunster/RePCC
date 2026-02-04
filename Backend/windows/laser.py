@@ -75,6 +75,9 @@ class LaserOverlay(QWidget):
 
         self.trail = deque(maxlen=20)
 
+        cc = tuple(loaded_settings["laserpointer"].get("corecolor", [255, 0, 0, 0]))
+        self.coreColor = QColor(cc[0], cc[1], cc[2], cc[3])
+
         self.positionUpdate.connect(self._updatePosInternal)
 
         # makes the cursor be able to click through the widget
@@ -145,7 +148,7 @@ class LaserOverlay(QWidget):
             gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
             gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
             gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
-            gradient.setColorAt(1, QColor(255, 0, 0, 0))
+            gradient.setColorAt(1, self.coreColor)
 
             painter.setBrush(gradient)
             painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
