@@ -148,3 +148,6 @@ def _runWEBRTC():
 
 def startWebRTCServer():
     threading.Thread(target=_runWEBRTC, daemon=True).start()
+
+if __name__ == "__main__": 
+    _runWEBRTC()

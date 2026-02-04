@@ -152,6 +152,8 @@ class macro():
             logger.info(f"        {req}")
             logger.info(f"        {data}")
             logger.info(f"        {i}")
+
+            print(data)
             
             if not CHECK_layout(req, data):
                 raise ValueError(f"""
@@ -234,6 +236,9 @@ Sleep is outside of range.
 
             try:
                 for key in data:
+                    if key == "$data":
+                        logger.debug("pcmac | Key is $data, skipping.")
+                        continue
                     if data[key]["type"] == "keyboard" or (data[key]["type"] == "mouse" and data[key]["actiontype"] == "click"):
                         CHECK_keys(reqKeyboardAndStaticMouse, data[key]["type"], data[key], int(key))
                         continue
@@ -272,6 +277,23 @@ Sleep is outside of range.
         :param v: Verbose
         :type v: bool
         """
+
+        param_isLoop = None # default if no isloop param is missing
+        param_amtLoops = None
+
+        def handler_data(data:dict):
+
+            nonlocal param_isLoop
+            nonlocal param_amtLoops
+            
+            if "isLoop" in data:
+                param_isLoop = data["isLoop"]
+                logger.info(f"pcmac | macro: set loop to { param_isLoop }")
+                print(f"updated: {param_isLoop}")
+            
+            if "amtLoops" in data:
+                param_amtLoops = data["amtLoops"]
+                logger.info(f"pcmac | macro: set amount of loops to {param_amtLoops}")
 
         def handler_mousemove(x_then:float, y_then:float, transitionTimeMS:float, transition:str):
             logger.debug("pcmac | Macro: Moving mouse.")
@@ -382,25 +404,53 @@ Sleep is outside of range.
                 data = json.load(f)
                 f.close()
 
-            for step in data:
+            def run():
+                for step in data:
 
-                actiondata = data[step]["actiondata"]
-                
-                logger.debug("pcmac | Macro: Waiting before executing next step...")
-                logger.debug("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
-                time.sleep(data[step]["sleep"]/1000+0.001)
-                
-                if data[step]["type"] == "mouse" and data[step]["actiontype"] == "move":
-                    handler_mousemove(actiondata[0], actiondata[1], data[step]["transitiontime"], data[step]["transition"])
-                    continue
+                    if step == "$data":
+                        logger.debug("pcmac | Macro: Setp is data. Skipping.")
+                        continue
 
-                if data[step]["type"] == "mouse" and data[step]["actiontype"] == "click":
-                    handler_mouseclick(actiondata[0], data[step]["presssleep"])
-                    continue
-                
-                if data[step]["type"] == "keyboard":
-                    handler_keyboard(data[step]["actiontype"], actiondata, data[step]["presssleep"])
-                    continue
+                    actiondata = data[step]["actiondata"]
+                    
+                    logger.debug("pcmac | Macro: Waiting before executing next step...")
+                    logger.debug("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
+                    time.sleep(data[step]["sleep"]/1000+0.001)
+                    
+                    if data[step]["type"] == "mouse" and data[step]["actiontype"] == "move":
+                        handler_mousemove(actiondata[0], actiondata[1], data[step]["transitiontime"], data[step]["transition"])
+                        continue
+
+                    if data[step]["type"] == "mouse" and data[step]["actiontype"] == "click":
+                        handler_mouseclick(actiondata[0], data[step]["presssleep"])
+                        continue
+                    
+                    if data[step]["type"] == "keyboard":
+                        handler_keyboard(data[step]["actiontype"], actiondata, data[step]["presssleep"])
+                        continue
+
+            if "$data" in data:
+                logger.debug("main | macro: Macro has included data, extracting...")
+                handler_data(data["$data"])
+                logger.info(f"main | macro: extracted data: { data['$data'] }")
+
+
+            print(param_isLoop)
+
+            if param_isLoop == True:
+                while True:
+                    print("call")
+                    run()
+
+            elif param_amtLoops > 1:
+                for i in range(param_amtLoops):
+                    print("amt call")
+                    print(i+1)
+                    run()
+
+            else:
+                print("singleloop")
+                run()
 
         except Exception as e:
             logger.error(customerror("pcmac", e))
@@ -510,10 +560,15 @@ def initializePCMAC(v:bool=False):
             logger.error(customerror("pcmac", "Script is not running as administrator. Can not complete registry verification."))
 
         logger.debug(f"pcmac | regedit: Done.")
+    
     logger.debug("pcmac | Running verification...")
     logger.info(f"pcmac | Current filestructure version: {str(FILEVER)}")
+
     versionVerification()
     regVerification()
 
 if __name__ == "__main__":
     initializePCMAC()
+    mac=macro()
+    #mac.verifyStructure("./base/structure.json")
+    mac.runMacro("mouseTest.pcmac")
