@@ -22,7 +22,7 @@ from zeroconf import Zeroconf, ServiceInfo
 # custom imports
 
 from args import LOGGER_CONF, customerror, forceLogFolder
-from pcmac import initializePCMAC
+#from pcmac import initializePCMAC
 from webrtc import startWebRTCServer
 # --
 
@@ -160,7 +160,7 @@ if __name__ == "__main__":
     logger.info("Wakey wakey eggs 'n bakey! Time to run!")
 
     logger.info("main | Initializing .pcmac")
-    initializePCMAC()
+    #initializePCMAC()
 
     logger.info("main | Initializing mDNS")
     MDNS, SERVICEINFO = registerMDNS()
