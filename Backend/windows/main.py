@@ -155,7 +155,6 @@ def registerMDNS(port:int = 15250):
 
 if __name__ == "__main__":
 
-
     logger.info("\n\n--------------------START--------------------")
     logger.info("Wakey wakey eggs 'n bakey! Time to run!")
 
@@ -165,7 +164,7 @@ if __name__ == "__main__":
     logger.info("main | Initializing mDNS")
     MDNS, SERVICEINFO = registerMDNS()
 
-    #startWebRTCServer()
+    startWebRTCServer()
     logger.info(f"main | WebRTC server started.")
 
     if os.name == "nt":
