@@ -1,4 +1,7 @@
+# Baselevel functions that are reused in multiple files
+
 import os
+import sys
 import logging
 import random
 import logging.config
@@ -26,6 +29,7 @@ RANDOM_ERROR_LIST = [
 ]
 
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
+TWOFACODE = None
 
 LOGGER_CONF = {
     "version": 1,
@@ -45,7 +49,7 @@ LOGGER_CONF = {
         },
         "fileHandler": {
             "class": "logging.handlers.RotatingFileHandler",
-            "level": "DEBUG",
+            "level": "WARNING",
             "formatter": "simpleFormatter",
             "filename": str(ROAMING+"\\.RePCC\\logs\\repcc.log"),
             "mode": "a",
@@ -78,3 +82,16 @@ def forceLogFolder():
     logger.debug("CONFIG | Log folder forefully created.")
 
     return logger
+
+def NEW2FA():
+    global TWOFACODE
+    TWOFACODE = random.randint(11111111,99999999)
+
+def assetsPath(relativepath:str):
+    """
+    For easy file access in py script or binary
+    
+    :param relativepath: Relative filepath for asset. e. g. /assets/repcclogo.ico
+    """
+    basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(basepath, relativepath)

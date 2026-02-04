@@ -16,7 +16,7 @@ import subprocess
 import logging.config
 
 from pynput.keyboard import Controller, Key
-from args import LOGGER_CONF, customerror, forceLogFolder
+from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath
 
 try:
     logging.config.dictConfig(LOGGER_CONF)
@@ -28,7 +28,7 @@ APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # 
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
 
-FILEVER = "0.185"
+FILEVER = "0.19"
 SPECIAL_KEY_MAP = {
     'ctrl': Key.ctrl,
     'shift': Key.shift,
@@ -87,15 +87,6 @@ SPECIAL_KEY_MAP = {
     'menu': Key.menu,
     'backspace_l': Key.backspace,
 }
-
-def assetsPath(relativepath:str):
-    """
-    For easy file access in py script or binary
-    
-    :param relativepath: Relative filepath for asset. e. g. /assets/repcclogo.ico
-    """
-    basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(basepath, relativepath)
 
 class macro():
     def __init__(self) -> None:
@@ -442,8 +433,8 @@ Sleep is outside of range.
                     print("call")
                     run()
 
-            elif param_amtLoops > 1:
-                for i in range(param_amtLoops):
+            elif param_amtLoops > 1: # type: ignore[attr-defined]
+                for i in range(param_amtLoops): # type: ignore[attr-defined]
                     print("amt call")
                     print(i+1)
                     run()

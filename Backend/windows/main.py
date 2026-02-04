@@ -4,9 +4,10 @@ import os
 import uuid
 import yaml
 import socket
-import random
+import pystray
 import logging
 import uvicorn
+import threading
 import logging.config
 
 # --
@@ -16,13 +17,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from PIL import Image
+
 from zeroconf import Zeroconf, ServiceInfo
 
 # --
 # custom imports
 
-from args import LOGGER_CONF, customerror, forceLogFolder
-#from pcmac import initializePCMAC
+from args import LOGGER_CONF, customerror, forceLogFolder, NEW2FA, assetsPath, TWOFACODE
+from pcmac import initializePCMAC
 from webrtc import startWebRTCServer
 # --
 
@@ -30,11 +33,6 @@ MAC = ':'.join(('%012X' % uuid.getnode())[i:i+2] for i in range(0, 12, 2))
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 TWOFACODE = None
 
-def NEW2FA():
-    global TWOFACODE
-    TWOFACODE = random.randint(11111111,99999999)
-
-NEW2FA()
 
 try:
     logging.config.dictConfig(LOGGER_CONF)
@@ -83,16 +81,15 @@ async def repccConnect(request:Request):
     def pair(mac:str, ip:str, macsYAML:dict):
 
         if not macsYAML["MAC"] == None:
-            macsYAML["MAC"].append(mac)
+            if not mac in macsYAML["MAC"]:
+                macsYAML["MAC"].append(mac)
         else: 
             macsYAML["MAC"] = [mac] # type: ignore[attr-defined]
         if not macsYAML["IP"] == None:
             if not mac in macsYAML["IP"]:
                 macsYAML["IP"][mac] = ip
         else: 
-            print("ip el")
             macsYAML["IP"] = {str(mac) : str(ip)}
-            print(macsYAML)
         yaml.safe_dump(macsYAML, open(ROAMING+"\\.RePCC\\settings\\register.yaml", "w"))
         return
 
@@ -100,9 +97,9 @@ async def repccConnect(request:Request):
 
         if not macsYAML["MAC"] == None:
             if data["mac"] in macsYAML["MAC"]:
-
-                print(":3")
-                
+                 # type: ignore
+                pair(data["mac"], request.client.host, macsYAML) # type: ignore
+                logger.debug("main | Connect request accepted due to saved MAC")
                 return JSONResponse({"message":"Accepted"}, status_code=200)
 
         if int(data["2fa"]) == TWOFACODE:
@@ -122,14 +119,7 @@ async def repccConnect(request:Request):
         return ValueError("2fa mismatch & no entry in connected MACs")
 
     except Exception as e:
-        print(e)
         return JSONResponse({"Error":str(e)}, status_code=404)
-
-#--------------- SETTINGS 
-
-@App.get("settings/{file}")
-async def getSetting(file:str):
-    ...
 
 def registerMDNS(port:int = 15250):
     
@@ -153,13 +143,62 @@ def registerMDNS(port:int = 15250):
     zc.register_service(serviceinfo)
     return zc, serviceinfo
 
+#   --------------- SETTINGS 
+
+@App.get("settings/{file}")
+async def getSetting(file:str):
+    ...
+
+#   --------------- MENU TRAY
+
+def tray_main():
+
+    try:
+        def testbool(icon, item):
+            testbool.enabled = not testbool.enabled # type: ignore
+            print("Event")
+            print(icon, item)
+            print()
+
+        testbool.enabled = False # type: ignore
+
+        tray_menu = pystray.Menu(
+            pystray.MenuItem("BoolTest", testbool, checked=lambda item: testbool.enabled), # type: ignore
+            
+        )
+
+        image = Image.open(assetsPath("assets/repcclogo.ico"))
+        icon = pystray.Icon("repcc", image, "RePCC", tray_menu)
+        icon.run()
+    except Exception as e:
+        print(e)
+
+#   --------------- STARTUP FUNCTIONS  
+
+def wipeSavedIPs():
+
+    logger.debug("main | removing saved IPs from previous session...")
+
+    register = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml", "r"))
+    register["IP"] = None
+
+    yaml.safe_dump(register, open(ROAMING+"\\.RePCC\\settings\\register.yaml", "w"))
+    logger.debug(f"main | IPs wiped. Registry data: {register}")
+
+#   --------------- MAIN 
+
 if __name__ == "__main__":
 
     logger.info("\n\n--------------------START--------------------")
     logger.info("Wakey wakey eggs 'n bakey! Time to run!")
 
+    NEW2FA()
+
+    logger.info("main | Running initual functions at startup...")
+    wipeSavedIPs()
+
     logger.info("main | Initializing .pcmac")
-    #initializePCMAC()
+    initializePCMAC()
 
     logger.info("main | Initializing mDNS")
     MDNS, SERVICEINFO = registerMDNS()
@@ -167,9 +206,12 @@ if __name__ == "__main__":
     startWebRTCServer()
     logger.info(f"main | WebRTC server started.")
 
+    threading.Thread(target=tray_main, daemon=True).start()
+    logger.info("main | Started tray thread.")
+
     if os.name == "nt":
         logger.info(f"main | Request server started.")
         uvicorn.run(App, host="0.0.0.0", port=15248, log_level="critical")
-        logger.info("\n---------------------END---------------------\n")
+        logger.info("\n---------------------END---------------------\n") # Not guaranteed to be in log
     else:
         logger.error(f"main | App started on an operating system that is not NTFS.")

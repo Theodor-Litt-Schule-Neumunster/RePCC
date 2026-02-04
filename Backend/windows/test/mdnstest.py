@@ -27,6 +27,7 @@ class TestListener(ServiceListener):
 
             ip = info.parsed_addresses()[0]
             props = info.properties
+            print(props)
             twofa = props[b"2fa"].decode('utf-8') # type: ignore
 
             addr = f"http://{ip}:15248/connect"
