@@ -6,6 +6,8 @@ import logging
 import random
 import logging.config
 
+from win11toast import toast
+
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 RANDOM_ERROR_LIST = [
     "Well... this is akward!",
@@ -49,7 +51,7 @@ LOGGER_CONF = {
         },
         "fileHandler": {
             "class": "logging.handlers.RotatingFileHandler",
-            "level": "WARNING",
+            "level": "INFO",
             "formatter": "simpleFormatter",
             "filename": str(ROAMING+"\\.RePCC\\logs\\repcc.log"),
             "mode": "a",
@@ -59,7 +61,7 @@ LOGGER_CONF = {
     },
     "loggers": {
         "RePCC": {
-            "level": "DEBUG",
+            "level": "INFO",
             "handlers": ["fileHandler"],
             "propagate": False
         }
@@ -74,7 +76,8 @@ def customerror(module:str, e):
     return f"""{module} | {RANDOM_ERROR_LIST[random.randint(0, len(RANDOM_ERROR_LIST)-1)]} - {e}"""
 
 def forceLogFolder():
-    os.mkdir(ROAMING+"\\.RePCC\\logs")
+
+    os.makedirs(ROAMING+"\\.RePCC\\logs")
 
     logging.config.dictConfig(LOGGER_CONF)
     logger = logging.getLogger("RePCC")
@@ -95,3 +98,12 @@ def assetsPath(relativepath:str):
     """
     basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(basepath, relativepath)
+
+def sendNotification(title:str, body:str):
+
+    toast(
+        title=title,
+        body=body,
+        icon=assetsPath("assets/repcclogo.ico"),
+        duration="short"
+    )

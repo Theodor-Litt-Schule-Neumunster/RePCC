@@ -23,10 +23,10 @@ from zeroconf import Zeroconf, ServiceInfo
 
 # --
 # custom imports
-
-from args import LOGGER_CONF, customerror, forceLogFolder, NEW2FA, assetsPath, TWOFACODE
 from pcmac import initializePCMAC
 from webrtc import startWebRTCServer
+from args import LOGGER_CONF, NEW2FA, customerror, forceLogFolder,  assetsPath,  sendNotification
+
 # --
 
 MAC = ':'.join(('%012X' % uuid.getnode())[i:i+2] for i in range(0, 12, 2))
@@ -73,12 +73,15 @@ SERVICEINFO = None
 @App.post("/connect")
 async def repccConnect(request:Request):
 
+    print("Connect request")
+
     logger.debug(f"main | Recieving new request to connect by {request.client.host}") # type: ignore[attr-defined]
 
     data = await request.json()
     macsYAML = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
 
     def pair(mac:str, ip:str, macsYAML:dict):
+        print("Pair")
 
         if not macsYAML["MAC"] == None:
             if not mac in macsYAML["MAC"]:
@@ -95,16 +98,20 @@ async def repccConnect(request:Request):
 
     try:
 
+        print(macsYAML)
+
         if not macsYAML["MAC"] == None:
             if data["mac"] in macsYAML["MAC"]:
                  # type: ignore
                 pair(data["mac"], request.client.host, macsYAML) # type: ignore
                 logger.debug("main | Connect request accepted due to saved MAC")
+                sendNotification("RePCC Connection", f"Device {request.client.host} connected.")
                 return JSONResponse({"message":"Accepted"}, status_code=200)
 
         if int(data["2fa"]) == TWOFACODE:
 
             NEW2FA()
+            print("Check 2fa")
             
             logger.debug("main | Connect request accepted. New 2FA requested.")
             pair(data["mac"], request.client.host, macsYAML) # type: ignore[attr-defined]
@@ -114,6 +121,7 @@ async def repccConnect(request:Request):
                 MDNS.update_service(SERVICEINFO)
                 logger.debug("main | Updated mDNS service with new 2FA code")
 
+            sendNotification("RePCC Connection", f"Device {request.client.host} connected and paired.")
             return JSONResponse({"message":"Accepted and paired."}, status_code=200)
             
         return ValueError("2fa mismatch & no entry in connected MACs")
@@ -122,6 +130,8 @@ async def repccConnect(request:Request):
         return JSONResponse({"Error":str(e)}, status_code=404)
 
 def registerMDNS(port:int = 15250):
+
+    from args import TWOFACODE
     
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
@@ -153,6 +163,21 @@ async def getSetting(file:str):
 
 def tray_main():
 
+    # TODO:
+    #   - Close
+    #   - Settings
+    #       - Disallow / Allow connections
+    #
+    #   - Connected Clients
+    #       - Disconnect from client
+    #
+    #   - Open Dashboard (MainWindow)
+    #   - Macros (Lists Macros)
+    #       - [ANY MACRO]
+    #           - Delete / Run / Edit
+    #       - Add Macro
+
+
     try:
         def testbool(icon, item):
             testbool.enabled = not testbool.enabled # type: ignore
@@ -164,7 +189,6 @@ def tray_main():
 
         tray_menu = pystray.Menu(
             pystray.MenuItem("BoolTest", testbool, checked=lambda item: testbool.enabled), # type: ignore
-            
         )
 
         image = Image.open(assetsPath("assets/repcclogo.ico"))
