@@ -11,11 +11,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // List of devices managed by the state
-  List<Device> devices = [
-    Device(id: '1', name: 'Device 1', isConnected: true),
-    Device(id: '2', name: 'Device 2', isConnected: false),
-  ];
+  // List of devices managed by the state - now starts empty
+  List<Device> devices = [];
 
   @override
   Widget build(BuildContext context) {
@@ -90,17 +87,35 @@ class _HomeScreenState extends State<HomeScreen> {
           device.name,
           style: TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono', fontWeight: FontWeight.normal),
         ),
-        subtitle: Text.rich(
-          TextSpan(
-            text: 'Status: ',
-            style: TextStyle(color: Colors.white70),
-            children: [
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text.rich(
               TextSpan(
-                text: device.isConnected ? 'Connected' : 'Disconnected',
-                style: TextStyle(color: device.isConnected ? Colors.green : Colors.white70),
+                text: 'Status: ',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+                children: [
+                  TextSpan(
+                    text: device.isConnected ? 'Connected' : 'Disconnected',
+                    style: TextStyle(color: device.isConnected ? Colors.green : Colors.white70),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'IP: ${device.ipAddress}',
+              style: TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            ),
+            Text(
+              'MAC: ${device.macAddress}',
+              style: TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            ),
+            Text(
+              'Ports: ${device.ports.join(", ")}',
+              style: TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            ),
+          ],
         ),
         trailing: IconButton(
           onPressed: onDelete,
