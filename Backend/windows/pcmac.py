@@ -1,6 +1,7 @@
 #filever : 0.2 indev
 
 #pyinstaller cmdlet: pyinstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repccBin.ico" pcmac.py
+# py -3 -m PyInstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repccBin.ico" pcmac.py
 
 import os
 import sys
@@ -269,6 +270,8 @@ Sleep is outside of range.
         :type v: bool
         """
 
+        print("run mac")
+
         param_isLoop = None # default if no isloop param is missing
         param_amtLoops = None
 
@@ -312,6 +315,7 @@ Sleep is outside of range.
             transitionTimeSEC = transitionTimeMS / 1000
             steps = max(int(transitionTimeSEC*60), 1)
             sleep_time = transitionTimeSEC / steps
+            print(steps)
 
             for i in range(steps + 1):
 
@@ -394,9 +398,12 @@ Sleep is outside of range.
             with open(macropath, "r") as f:
                 data = json.load(f)
                 f.close()
+                print(data)
 
             def run():
                 for step in data:
+                    print(step)
+                    print(1)
 
                     if step == "$data":
                         logger.debug("pcmac | Macro: Setp is data. Skipping.")
@@ -425,23 +432,32 @@ Sleep is outside of range.
                 handler_data(data["$data"])
                 logger.info(f"main | macro: extracted data: { data['$data'] }")
 
-
+            print("2")
             print(param_isLoop)
+            print("!")
 
-            if param_isLoop == True:
-                while True:
-                    print("call")
-                    run()
+            try:
 
-            elif param_amtLoops > 1: # type: ignore[attr-defined]
-                for i in range(param_amtLoops): # type: ignore[attr-defined]
-                    print("amt call")
-                    print(i+1)
-                    run()
+                if param_isLoop == True:
+                    print("loop")
+                    while True:
+                        print("call")
+                        run()
 
-            else:
-                print("singleloop")
-                run()
+                elif param_amtLoops > 1 and not param_amtLoops == None: # type: ignore[attr-defined]
+                    print("ey")
+                    for i in range(int(param_amtLoops)): # type: ignore[attr-defined]
+                        print("amt call")
+                        print(i+1)
+                        run()
+                        return
+            except:
+                print("Fail. Running solo")
+
+            print("a")
+            print("singleloop")
+            run()
+            return
 
         except Exception as e:
             logger.error(customerror("pcmac", e))
@@ -559,7 +575,7 @@ def initializePCMAC(v:bool=False):
     regVerification()
 
 if __name__ == "__main__":
-    initializePCMAC()
+    #initializePCMAC()
     mac=macro()
     #mac.verifyStructure("./base/structure.json")
-    mac.runMacro("mouseTest.pcmac")
+    mac.runMacro("app.pcmac")
