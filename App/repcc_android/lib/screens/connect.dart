@@ -81,6 +81,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
               isConnected: false,
             );
 
+            if (!mounted) return;
             setState(() {
               if (!_discoveredDevices.any((d) => d.id == device.id)) {
                 _discoveredDevices.add(device);
@@ -92,6 +93,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
       client.stop();
 
+      if (!mounted) return;
       setState(() {
         _isScanning = false;
         _statusMessage = _discoveredDevices.isEmpty 
@@ -99,6 +101,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             : 'Found ${_discoveredDevices.length} device(s)';
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isScanning = false;
         _statusMessage = 'Error scanning: $e';
