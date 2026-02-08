@@ -33,7 +33,6 @@ MAC = ':'.join(('%012X' % uuid.getnode())[i:i+2] for i in range(0, 12, 2))
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 TWOFACODE = None
 
-
 try:
     logging.config.dictConfig(LOGGER_CONF)
     logger = logging.getLogger("RePCC")
@@ -50,20 +49,25 @@ App.add_middleware(
     allow_headers=["*"],
 )
 
-@App.get("/ping")
-async def ping(request:Request):
+def requestsInit():
+    logger.info("main | Initializing FASTAPI requests...")
+    @App.get("/ping")
+    async def ping(request:Request):
 
-    macsYaml = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
+        macsYaml = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
 
-    if not macsYaml["IP"] == None:
-        if request.client.host in macsYaml["IP"]: # type: ignore[attr-defined]
-            return JSONResponse({"message":"Success"}, status_code=202)
+        if not macsYaml["IP"] == None:
+            if request.client.host in macsYaml["IP"]: # type: ignore[attr-defined]
+                return JSONResponse({"message":"Success"}, status_code=202)
 
-    logger.info(f"main | Recieved ping from {request.client.host}. Responding with OK") # type: ignore[attr-defined]
-    return JSONResponse({"message":"Success"}, status_code=200)
+        logger.info(f"main | Recieved ping from {request.client.host}. Responding with OK") # type: ignore[attr-defined]
+        return JSONResponse({"message":"Success"}, status_code=200)
 
-    # TODO: Add Argparser for manual saving reading opening
-    # TODO: Add HTTP requests for saving reading opening
+        # TODO: Add Argparser for manual saving reading opening
+        # TODO: Add HTTP requests for saving reading opening
+
+
+    logger.info("main | Requests init finished.")
 
 #   --------------- mDNS AUTO PAIRING
 
@@ -105,7 +109,7 @@ async def repccConnect(request:Request):
                  # type: ignore
                 pair(data["mac"], request.client.host, macsYAML) # type: ignore
                 logger.debug("main | Connect request accepted due to saved MAC")
-                sendNotification("RePCC Connection", f"Device {request.client.host} connected.")
+                sendNotification("RePCC Connection", f"Device {request.client.host} connected.") # type: ignore
                 return JSONResponse({"message":"Accepted"}, status_code=200)
 
         if int(data["2fa"]) == TWOFACODE:
@@ -121,7 +125,7 @@ async def repccConnect(request:Request):
                 MDNS.update_service(SERVICEINFO)
                 logger.debug("main | Updated mDNS service with new 2FA code")
 
-            sendNotification("RePCC Connection", f"Device {request.client.host} connected and paired.")
+            sendNotification("RePCC Connection", f"Device {request.client.host} connected and paired.") # type: ignore
             return JSONResponse({"message":"Accepted and paired."}, status_code=200)
             
         return ValueError("2fa mismatch & no entry in connected MACs")
@@ -220,6 +224,7 @@ if __name__ == "__main__":
 
     logger.info("main | Running initual functions at startup...")
     wipeSavedIPs()
+    requestsInit()
 
     logger.info("main | Initializing .pcmac")
     initializePCMAC()

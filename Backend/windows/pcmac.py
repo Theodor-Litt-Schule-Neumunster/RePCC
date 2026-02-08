@@ -4,7 +4,6 @@
 # py -3 -m PyInstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repccBin.ico" pcmac.py
 
 import os
-import sys
 import json
 import time
 import shutil
@@ -13,11 +12,12 @@ import winreg
 import logging
 import win32api
 import win32con
+import threading
 import subprocess
 import logging.config
 
-from pynput.keyboard import Controller, Key
-from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath
+from pynput.keyboard import Controller, Key, Listener, KeyCode
+from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath, sendNotification
 
 try:
     logging.config.dictConfig(LOGGER_CONF)
@@ -92,6 +92,45 @@ SPECIAL_KEY_MAP = {
 class macro():
     def __init__(self) -> None:
         pass
+
+        self.kill = False
+        self.pressedkeys = set()
+        self.presscombo = {"Key.esc", "'x'"}
+
+        self.listener = None
+
+    def wait(self, time_ms:int|float):
+        
+        for _ in range(int(time_ms)):
+            if self.kill:
+                break
+
+            time.sleep(1/1000)
+
+    def _keybindListener(self):
+
+        sendNotification("Macro help", "Press CONTROL and K at the same time to stop the macro.")
+
+        def press(key):
+
+            print(str(key))
+            self.pressedkeys.add(str(key))
+            print(self.pressedkeys)
+            print(self.presscombo)
+            print()
+
+            if str(key) == "'\\x0b'": # CTRL + K  
+                print("Combo")
+                logger.debug("Keycombo pressed, killing macro.")
+                self.kill = True
+
+        self.listener = Listener(on_press=press)
+        with self.listener:
+            self.listener.join()
+
+    def startKeyListener(self):
+        self.listenerThread = threading.Thread(target=self._keybindListener, daemon=True)
+        self.listenerThread.start()
 
     def verifyStructure(self, jsonFilePath:str, v:bool=False) -> bool:
         """
@@ -275,6 +314,8 @@ Sleep is outside of range.
         param_isLoop = None # default if no isloop param is missing
         param_amtLoops = None
 
+        kill = False
+
         def handler_data(data:dict):
 
             nonlocal param_isLoop
@@ -312,9 +353,8 @@ Sleep is outside of range.
             x_delta = x_abs_then - x_now
             y_delta = y_abs_then - y_now
 
-            transitionTimeSEC = transitionTimeMS / 1000
-            steps = max(int(transitionTimeSEC*60), 1)
-            sleep_time = transitionTimeSEC / steps
+            steps = max(int(transitionTimeMS*60), 1)
+            sleep_time = transitionTimeMS / steps
             print(steps)
 
             for i in range(steps + 1):
@@ -332,30 +372,42 @@ Sleep is outside of range.
                     x_new = int(x_now + x_delta * transitionProgress)
                     y_new = int(y_now + y_delta * transitionProgress)
 
-                win32api.SetCursorPos((x_new, y_new))
-                if i < steps:
-                    time.sleep(sleep_time+0.005)
+                if not self.kill:
+
+                    win32api.SetCursorPos((x_new, y_new))
+                    if i < steps:
+                        self.wait(sleep_time+0.005)
+                
+                else: 
+                    print("commiting suicide... (MOUSE MOVE)")
+                    break
 
         def handler_mouseclick(button:int, pressSleep:int):
 
             logger.debug(f"pcmac | Macro: Clicking mouse. Button: {button}")
             logger.debug(f"pcmac | Macro: Press length: " + str(pressSleep/1000) + " seconds.")
-            
-            if button == 0:
-                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0,0)
-                time.sleep(pressSleep/1000+0.001)
-                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0,0)
 
-            if button == 1:
-                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0,0)
-                time.sleep(pressSleep/1000+0.001)
-                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0,0)
+            if not self.kill:
+            
+                if button == 0:
+                    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0,0)
+                    self.wait(pressSleep+0.001)
+                    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0,0)
+
+                if button == 1:
+                    win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0,0)
+                    self.wait(pressSleep+0.001)
+                    win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0,0)
+
+            else:
+                print("I'm KILLING myself im KILLLLIIINNNNGG myself (click)")
+                return
             
         def handler_keyboard(actiontype:str, keys:list, presssleep:int):
             keyboard = Controller()
 
             logger.debug(f"pcmac | Macro: Using keyboard. Type: {actiontype}")
-            logger.debug(f"pcmac | Macro: Press length: " + str(presssleep/1000) + " seconds.")
+            logger.debug(f"pcmac | Macro: Press ladength: " + str(presssleep) + " seconds.")
             logger.debug(f"pcmac | Macro: Appended data: {keys}")
 
             if actiontype == "singlekey":
@@ -369,25 +421,32 @@ Sleep is outside of range.
 
                             key = key.caps_lock
 
-                    keyboard.press(actual_key) # type: ignore[attr-defined]
-                    time.sleep(presssleep/1000+0.002)
-                    keyboard.release(actual_key) # type: ignore[attr-defined]
-            
+                    if not self.kill:
+
+                        keyboard.press(actual_key) # type: ignore[attr-defined]
+                        self.wait(presssleep+0.002)
+                        keyboard.release(actual_key) # type: ignore[attr-defined]
+                    
+                    else:
+                        print("man im dead")
+                        break
+                
             if actiontype == "multikey":
 
                 actual_keys = []
 
-                for key in keys:
-                    key_lower = key.lower()
-                    actual_key = SPECIAL_KEY_MAP.get(key_lower, key_lower)
-                    actual_keys.append(actual_key)
+                if not self.kill:
+                    for key in keys:
+                        key_lower = key.lower()
+                        actual_key = SPECIAL_KEY_MAP.get(key_lower, key_lower)
+                        actual_keys.append(actual_key)
 
-                    keyboard.press(actual_key) # type: ignore[attr-defined]
+                        keyboard.press(actual_key) # type: ignore[attr-defined]
 
-                time.sleep(presssleep/1000+0.002)
+                    self.wait(presssleep+0.002)
 
-                for key in reversed(actual_keys):
-                    keyboard.release(key)
+                    for key in reversed(actual_keys):
+                        keyboard.release(key)
 
         try:
             macropath = MACDATA + "\\macros\\" + MacroName
@@ -401,10 +460,8 @@ Sleep is outside of range.
                 print(data)
 
             def run():
-                for step in data:
-                    print(step)
-                    print(1)
 
+                for step in data:
                     if step == "$data":
                         logger.debug("pcmac | Macro: Setp is data. Skipping.")
                         continue
@@ -413,7 +470,9 @@ Sleep is outside of range.
                     
                     logger.debug("pcmac | Macro: Waiting before executing next step...")
                     logger.debug("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
-                    time.sleep(data[step]["sleep"]/1000+0.001)
+                    self.wait(data[step]["sleep"]+0.001)
+
+                    if self.kill: break
                     
                     if data[step]["type"] == "mouse" and data[step]["actiontype"] == "move":
                         handler_mousemove(actiondata[0], actiondata[1], data[step]["transitiontime"], data[step]["transition"])
@@ -427,40 +486,67 @@ Sleep is outside of range.
                         handler_keyboard(data[step]["actiontype"], actiondata, data[step]["presssleep"])
                         continue
 
+                if self.kill:
+                    sendNotification("Macro status", "Forced macro to shut down with keycombo")
+                    return
+
             if "$data" in data:
                 logger.debug("main | macro: Macro has included data, extracting...")
                 handler_data(data["$data"])
                 logger.info(f"main | macro: extracted data: { data['$data'] }")
 
-            print("2")
-            print(param_isLoop)
-            print("!")
+            failsafe = 0
 
             try:
 
                 if param_isLoop == True:
-                    print("loop")
+                    self.startKeyListener()
                     while True:
+
+                        if self.kill or failsafe == 10: 
+                            if self.listener:
+                                self.listener.stop()
+                            if self.listenerThread:
+                                self.listenerThread.join()
+
+                            print("kill inf")
+                            break
+
                         print("call")
                         run()
 
                 elif param_amtLoops > 1 and not param_amtLoops == None: # type: ignore[attr-defined]
-                    print("ey")
+                    self.startKeyListener()
                     for i in range(int(param_amtLoops)): # type: ignore[attr-defined]
+
+                        if self.kill: 
+                            if self.listener:
+                                self.listener.stop()
+                            if self.listenerThread:
+                                self.listenerThread.join()
+
+                            print("kill amnt")
+                            break
+
                         print("amt call")
                         print(i+1)
                         run()
                         return
-            except:
-                print("Fail. Running solo")
+            except Exception:
+                print("Fail inside")
 
-            print("a")
-            print("singleloop")
-            run()
+                if not Exception.__class__ == KeyboardInterrupt:
+
+                    self.startKeyListener()
+                    print("singleloop")
+                    run()
+
+            if self.kill: self.kill = False
             return
 
         except Exception as e:
             logger.error(customerror("pcmac", e))
+
 
 def initializePCMAC(v:bool=False):
 
@@ -577,5 +663,6 @@ def initializePCMAC(v:bool=False):
 if __name__ == "__main__":
     #initializePCMAC()
     mac=macro()
+
     #mac.verifyStructure("./base/structure.json")
-    mac.runMacro("app.pcmac")
+    mac.runMacro("testMouseMove.pcmac")
