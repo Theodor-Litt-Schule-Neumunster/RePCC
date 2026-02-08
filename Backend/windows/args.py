@@ -2,8 +2,10 @@
 
 import os
 import sys
-import logging
+import time
 import random
+import logging
+import threading
 import logging.config
 
 from win11toast import toast
@@ -67,7 +69,7 @@ LOGGER_CONF = {
         }
     },
     "root": {
-        "level": "DEBUG",
+        "level": "INFO",
         "handlers": ["consoleHandler", "fileHandler"]
     }
 }
@@ -101,9 +103,13 @@ def assetsPath(relativepath:str):
 
 def sendNotification(title:str, body:str):
 
-    toast(
-        title=title,
-        body=body,
-        icon=assetsPath("assets/repcclogo.ico"),
-        duration="short"
-    )
+    def _():
+        toast(
+            title=title,
+            body=body,
+            icon=assetsPath("assets/repcclogo.ico"),
+            duration="short"
+        )
+
+    threading.Thread(target=_).start()
+
