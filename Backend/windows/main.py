@@ -3,6 +3,7 @@
 import os
 import uuid
 import yaml
+import json
 import socket
 import pystray
 import logging
@@ -70,10 +71,63 @@ def requestsInit():
 
         @App.get("/macro/getall")
         async def macros_getall(request:Request):
-            ...
+            lis = [str(x)[:-6] for x in os.listdir(ROAMING+"\\.RePCC\\macros")]
+            return JSONResponse({"macros":lis}, status_code=200)
 
         @App.get("/macro/get/{name}")
-        async def macros_getone(request:Request, name:str):
+        async def macros_getone(request:Request, name:str=None):
+
+            try:
+                data = await request.json()
+
+                method = data.get("METHOD", None)
+                if not method == None and not name == None:
+
+                    PATH = ROAMING+"\\.RePCC\\macros\\"+name
+
+                    if not name[-6:] == ".pcmac":
+                        PATH = PATH + ".pcmac"
+
+                    if method == "DATA":
+
+                        if os.path.exists(PATH):
+
+                            macrodata = None
+                            with open(PATH, "r") as macrofile:
+
+                                macrodata = json.load(macrofile)
+                                macrofile.close()
+                            
+                            return JSONResponse(macrodata, status_code=200)
+                        return
+
+                    if method == "CHECK":
+                        
+                        if os.path.exists(PATH):
+                            print("exists")
+                            return JSONResponse({}, status_code=200)
+                        
+                        print("no")
+                        return JSONResponse({}, status_code=404)
+                    
+                    return JSONResponse({"error":"Method is not DATA or CHECK"}, status_code=403)
+                else:
+                    return JSONResponse({"error":"Method is not in JSON"}, status_code=403)
+                
+            except Exception as e:
+                return JSONResponse({"error":str(e)}, status_code=403)
+        
+        @App.post("macro/save")
+        async def macros_save(request:Request):
+            
+            # TODO: 
+            # - Check if JSON is parsed
+            # - Send JSON to CheckFile in PCMAC
+            # - If its fine, check if file with name exsists
+            # - If file name exsists, add a 1 to the end.
+            # - Another file check, recursive. If also exsists, send it off again for 2 at the end and new name check
+            # - Write file and filename as new .pcmac file.
+            # - Send notification on PC to notify PC user that new macro has been created.
             ...
 
         logger.info("main | macro requests init finished.")
