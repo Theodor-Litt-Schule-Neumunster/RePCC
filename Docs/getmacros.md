@@ -20,8 +20,10 @@ http://127.0.0.1:15248/macro/getall
 Return: 
 ```json
 {
-    "mouseMove",
-    "example"
+    "macros" = [
+        "mouseMove",
+        "example"
+    ]
 }
 ```
 Die namen werden ohne der .PCMAC-Extension weitergeleitet, die übersetzung ob dort .pcmac ist oder nicht, übernimmt der Server.

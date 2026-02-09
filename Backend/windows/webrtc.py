@@ -138,12 +138,12 @@ async def offer(request: OfferRequest):
         }
 
     except Exception as e:
-        logger.error("WebRCT | ERROR @ webrct.py/offer")
-        logger.error(customerror("WebRCT", e))
+        logger.error("WebRTC | ERROR @ webrct.py/offer")
+        logger.error(customerror("WebRTC", e))
         return web.json_response({"error": str(e)}, status=500)
 
 def _runWEBRTC():
-    logger.info("WebRTC server running.")
+    logger.info("WebRTC | WebRTC server running.")
     uvicorn.run(App, host="0.0.0.0", port=15249)
 
 def startWebRTCServer():
