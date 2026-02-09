@@ -66,7 +66,22 @@ def requestsInit():
         # TODO: Add Argparser for manual saving reading opening
         # TODO: Add HTTP requests for saving reading opening
 
+    def _macroRequests():
 
+        @App.get("/macro/getall")
+        async def macros_getall(request:Request):
+            ...
+
+        @App.get("/macro/get/{name}")
+        async def macros_getone(request:Request, name:str):
+            ...
+
+        logger.info("main | macro requests init finished.")
+
+    def _settingsRequests():
+        ...
+
+    _macroRequests()
     logger.info("main | Requests init finished.")
 
 #   --------------- mDNS AUTO PAIRING
