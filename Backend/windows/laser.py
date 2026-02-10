@@ -85,8 +85,7 @@ class LaserOverlay(QWidget):
         # makes the cursor be able to click through the widget
         self.make_click_through()
         self.show()
-
-    
+ 
     def fadeout_reset(self):
 
         time = self.loaded_settings["laserpointer"].get("fadetime", 1000)

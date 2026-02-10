@@ -548,7 +548,7 @@ Sleep is outside of range.
             logger.error(customerror("pcmac", e))
 
 
-def initializePCMAC(v:bool=False):
+def initializePCMAC():
 
     filestructure = {
         ".RePCC": [
