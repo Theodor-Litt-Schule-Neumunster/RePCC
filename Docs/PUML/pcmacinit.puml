@@ -1,0 +1,44 @@
+@startuml PCMAC init sequence
+
+title PCMAC Init System
+
+!theme plain
+
+actor User
+
+participant initializePCMAC
+participant versionVerification
+participant fileVerification
+participant regVerification
+participant FileSystem
+participant Registry
+
+User -> initializePCMAC: PCMAC gestartet
+activate initializePCMAC
+initializePCMAC -> versionVerification
+
+activate versionVerification
+versionVerification -> FileSystem: Dateiversion wird gelesen
+FileSystem --> versionVerification: Version 
+
+alt Version stimmt nicht ein oder Datei gibt es nicht
+    versionVerification -> fileVerification
+    activate fileVerification
+    fileVerification -> FileSystem: Fehlende Dateien in Roaming werden erstellt
+    fileVerification --> versionVerification
+    deactivate fileVerification
+end
+
+versionVerification --> initializePCMAC
+deactivate versionVerification
+
+initializePCMAC -> regVerification: Verifizierung von den Registry-Keys gestartet
+activate regVerification
+alt Skript läuft als Administrator und Keys fehlen
+    regVerification -> Registry: Keys für .pcmac erstellt
+end
+
+regVerification --> initializePCMAC
+deactivate regVerification
+
+initializePCMAC --> User: Init fertig
