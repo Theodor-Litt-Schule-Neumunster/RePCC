@@ -121,7 +121,7 @@ class macro():
 
             if str(key) == "'\\x0b'": # CTRL + K  
                 print("Combo")
-                logger.debug("Keycombo pressed, killing macro.")
+                logger.info("Keycombo pressed, killing macro.")
                 self.kill = True
 
         self.listener = Listener(on_press=press)
@@ -268,7 +268,7 @@ Sleep is outside of range.
             try:
                 for key in data:
                     if key == "$data":
-                        logger.debug("pcmac | Key is $data, skipping.")
+                        logger.info("pcmac | Key is $data, skipping.")
                         continue
                     if data[key]["type"] == "keyboard" or (data[key]["type"] == "mouse" and data[key]["actiontype"] == "click"):
                         CHECK_keys(reqKeyboardAndStaticMouse, data[key]["type"], data[key], int(key))
@@ -331,7 +331,7 @@ Sleep is outside of range.
                 logger.info(f"pcmac | macro: set amount of loops to {param_amtLoops}")
 
         def handler_mousemove(x_then:float, y_then:float, transitionTimeMS:float, transition:str):
-            logger.debug("pcmac | Macro: Moving mouse.")
+            logger.info("pcmac | Macro: Moving mouse.")
             
             def easing(x:float) -> float:
 
@@ -384,8 +384,8 @@ Sleep is outside of range.
 
         def handler_mouseclick(button:int, pressSleep:int):
 
-            logger.debug(f"pcmac | Macro: Clicking mouse. Button: {button}")
-            logger.debug(f"pcmac | Macro: Press length: " + str(pressSleep/1000) + " seconds.")
+            logger.info(f"pcmac | Macro: Clicking mouse. Button: {button}")
+            logger.info(f"pcmac | Macro: Press length: " + str(pressSleep/1000) + " seconds.")
 
             if not self.kill:
             
@@ -406,9 +406,9 @@ Sleep is outside of range.
         def handler_keyboard(actiontype:str, keys:list, presssleep:int):
             keyboard = Controller()
 
-            logger.debug(f"pcmac | Macro: Using keyboard. Type: {actiontype}")
-            logger.debug(f"pcmac | Macro: Press ladength: " + str(presssleep) + " seconds.")
-            logger.debug(f"pcmac | Macro: Appended data: {keys}")
+            logger.info(f"pcmac | Macro: Using keyboard. Type: {actiontype}")
+            logger.info(f"pcmac | Macro: Press ladength: " + str(presssleep) + " seconds.")
+            logger.info(f"pcmac | Macro: Appended data: {keys}")
 
             if actiontype == "singlekey":
 
@@ -463,13 +463,13 @@ Sleep is outside of range.
 
                 for step in data:
                     if step == "$data":
-                        logger.debug("pcmac | Macro: Setp is data. Skipping.")
+                        logger.info("pcmac | Macro: Setp is data. Skipping.")
                         continue
 
                     actiondata = data[step]["actiondata"]
                     
-                    logger.debug("pcmac | Macro: Waiting before executing next step...")
-                    logger.debug("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
+                    logger.info("pcmac | Macro: Waiting before executing next step...")
+                    logger.info("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
                     self.wait(data[step]["sleep"]+0.001)
 
                     if self.kill: break
@@ -491,7 +491,7 @@ Sleep is outside of range.
                     return
 
             if "$data" in data:
-                logger.debug("main | macro: Macro has included data, extracting...")
+                logger.info("main | macro: Macro has included data, extracting...")
                 handler_data(data["$data"])
                 logger.info(f"main | macro: extracted data: { data['$data'] }")
 
@@ -563,25 +563,25 @@ def initializePCMAC(v:bool=False):
         for key in filestructure:
             if not os.path.exists(APPDATA+"\\"+key):
                 os.mkdir(APPDATA+"\\"+key)
-                logger.debug(f"pcmac | verif: Created folder {key}")
+                logger.info(f"pcmac | verif: Created folder {key}")
             if (type(filestructure[key]) == dict or type(filestructure[key]) == list) and len(filestructure[key]) > 0:
                 for subkey in filestructure[key]:
                     dir = APPDATA+"\\"+key+"\\"+subkey
                     
                     if not os.path.exists(dir):
                         os.mkdir(dir)
-                        logger.debug(f"pcmac | verif: Created subfolder {subkey} for {key}")
+                        logger.info(f"pcmac | verif: Created subfolder {subkey} for {key}")
                         if subkey == "assets":
                             shutil.copyfile(assetsPath("assets/repcclogo.ico"), MACDATA+"\\assets\\repcc.ico")
                             shutil.copyfile(assetsPath("assets/scriptlogo.ico"), MACDATA+"\\assets\\script.ico")
-                            logger.debug(f"pcmac | verif: Assets cloned into assets")
+                            logger.info(f"pcmac | verif: Assets cloned into assets")
 
                     if os.path.exists(MACDATA+"\\settings\\"):
                         defaultsettingdir = assetsPath("assets/_settings/")
                         usersettigdir = MACDATA+"\\settings\\"
 
                         if not len(os.listdir(defaultsettingdir)) == len(os.listdir(usersettigdir)):
-                            logger.debug(f"pcmac | verif: Settings length missmatch")
+                            logger.info(f"pcmac | verif: Settings length missmatch")
 
                             for file in os.listdir(defaultsettingdir):
                                 filedir = assetsPath("assets/_settings/"+file)
@@ -589,12 +589,12 @@ def initializePCMAC(v:bool=False):
                                 if not file in os.listdir(usersettigdir):
                                     shutil.copyfile(filedir, MACDATA+"\\settings\\"+file)
 
-                            logger.debug(f"pcmac | verif: Settings OK")
+                            logger.info(f"pcmac | verif: Settings OK")
 
         with open(MACDATA+"\\version", "w") as f:
             f.write(FILEVER)
             f.close()
-        logger.debug(f"pcmac | verif: Done.")
+        logger.info(f"pcmac | verif: Done.")
         
     def versionVerification():
         
@@ -605,33 +605,33 @@ def initializePCMAC(v:bool=False):
                 version = f.read()
                 f.close()
             if str(version) == FILEVER:
-                logger.debug("pcmac | Fileversion matches.")
+                logger.info("pcmac | Fileversion matches.")
             else:
-                logger.debug("pcmac | Fileversion does not match. Forcing file verification...")
+                logger.info("pcmac | Fileversion does not match. Forcing file verification...")
                 fileVerification()
         else:
-            logger.debug("pcmac | Fileversion noes not exsist. Forcing file verification...")
+            logger.info("pcmac | Fileversion noes not exsist. Forcing file verification...")
             fileVerification()
     
     def regVerification():
-        logger.debug(f"pcmac | regedit: Attempting.")
+        logger.info(f"pcmac | regedit: Attempting.")
         def restartExplorer():
             try:
-                logger.debug(f"pcmac | regedit: Restarting explorer.exe...")
+                logger.info(f"pcmac | regedit: Restarting explorer.exe...")
                 subprocess.run(["taskkill", "/f", "/im", "explorer.exe"])
                 subprocess.run(["explorer.exe"])
-                logger.debug(f"pcmac | regedit: Successfully restarted explorer.")
+                logger.info(f"pcmac | regedit: Successfully restarted explorer.")
             except Exception as e:
                 logger.error(customerror("pcmac", e))
         if ctypes.windll.shell32.IsUserAnAdmin():
-            logger.debug(f"pcmac | regedit: Is running with administrative privileges.")
+            logger.info(f"pcmac | regedit: Is running with administrative privileges.")
             def keySearch():
                 try:
                     key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, ".pcmac")
                     winreg.CloseKey(key)
                     return True
                 except FileNotFoundError:
-                    logger.debug(f"pcmac | regedit: Key does not exsist.")
+                    logger.info(f"pcmac | regedit: Key does not exsist.")
                     return False
         
             if not keySearch():
@@ -645,16 +645,16 @@ def initializePCMAC(v:bool=False):
                 winreg.CloseKey(icon_key)
                 winreg.CloseKey(progid_key)
 
-                logger.debug(f"pcmac | regedit: Successfully created all keys.")
+                logger.info(f"pcmac | regedit: Successfully created all keys.")
                 restartExplorer()
             else:
-                logger.debug(f"pcmac | regedit: Key exsits.")
+                logger.info(f"pcmac | regedit: Key exsits.")
         else:
             logger.error(customerror("pcmac", "Script is not running as administrator. Can not complete registry verification."))
 
-        logger.debug(f"pcmac | regedit: Done.")
+        logger.info(f"pcmac | regedit: Done.")
     
-    logger.debug("pcmac | Running verification...")
+    logger.info("pcmac | Running verification...")
     logger.info(f"pcmac | Current filestructure version: {str(FILEVER)}")
 
     versionVerification()

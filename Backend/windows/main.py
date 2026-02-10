@@ -24,7 +24,7 @@ from zeroconf import Zeroconf, ServiceInfo
 
 # --
 # custom imports
-from pcmac import initializePCMAC
+from pcmac import initializePCMAC, macro
 from webrtc import startWebRTCServer
 from args import LOGGER_CONF, NEW2FA, customerror, forceLogFolder,  assetsPath,  sendNotification
 
@@ -41,7 +41,7 @@ except Exception as e:
     logger = forceLogFolder()
 
 os.system("cls")
-App = FastAPI(debug=True)
+App = FastAPI(info=True)
 App.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],         
@@ -71,12 +71,13 @@ def requestsInit():
 
         @App.get("/macro/getall")
         async def macros_getall(request:Request):
+            logger.info("main | getall request recieded.")
             lis = [str(x)[:-6] for x in os.listdir(ROAMING+"\\.RePCC\\macros")]
             return JSONResponse({"macros":lis}, status_code=200)
 
         @App.get("/macro/get/{name}")
-        async def macros_getone(request:Request, name:str=None):
-
+        async def macros_getone(request:Request, name:str): #type: ignore
+            logger.info("main | getone request recieded.")
             try:
                 data = await request.json()
 
@@ -116,7 +117,56 @@ def requestsInit():
                 
             except Exception as e:
                 return JSONResponse({"error":str(e)}, status_code=403)
-        
+
+        @App.get("/macro/run/{name}")
+        async def macros_run(request:Request, name:str):
+            if name:
+
+                if not name[-6:] == ".pcmac":
+                    name = name+".pcmac"
+
+                PATHMACRO = ROAMING + "\\.RePCC\\macros\\" + name
+                PATHYAML = ROAMING + "\\.RePCC\\settings\\register.yaml"
+
+                if not os.path.exists(PATHMACRO):
+                    logger.error(customerror("main", "Attemted to run macro that does not exist."))
+                    return JSONResponse({"error":"Macro does not exist"}, status_code=404)
+                
+                try:
+                    macroHandler = macro()
+                    macroData = None
+
+                    registerYAML = yaml.safe_load(open(PATHYAML))
+                    if registerYAML["IP"] == None:
+                        logger.error(customerror("main", "Cannot run a Macro if no IPs are registered."))
+                        return JSONResponse({"error":"Not allowed"}, status_code=405)
+                    
+                    found = False
+                    for key in registerYAML["IP"]:
+                        if registerYAML["IP"][key] == request.client.host: # type: ignore
+                            found = True
+                            break
+
+                    if found == False:
+                        logger.error(customerror("main", "Cannot run a macro if IP is not registered."))
+                        return JSONResponse({"error":"Not allowed"}, status_code=405)
+
+                    with open(PATHMACRO, "r") as f:
+                        
+                        macroData = json.load(f)
+
+                    print(macroData)
+
+                    # TODO: FINISH INTEGRATION
+
+                except Exception as e:
+                    logger.error("main | ERROR @ main.py/_macroRequests/macros_run")
+                    logger.error(customerror("main", e))
+                    return JSONResponse({"error":"Fail inside macros_run"}, status_code=500)
+            else: 
+                customerror("main", "Attempted to run macro without parsing name.")
+                return JSONResponse({"error":"Running needs a name parsed."}, status_code=405)
+
         @App.post("macro/save")
         async def macros_save(request:Request):
             
@@ -146,12 +196,11 @@ SERVICEINFO = None
 @App.post("/connect")
 async def repccConnect(request:Request):
 
-    print("Connect request")
-
-    logger.debug(f"main | Recieving new request to connect by {request.client.host}") # type: ignore[attr-defined]
+    logger.info(f"main | Recieving new request to connect by {request.client.host}") # type: ignore[attr-defined]
 
     data = await request.json()
     macsYAML = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
+    argsYAML = macsYAML["ARGS"]
 
     def pair(mac:str, ip:str, macsYAML:dict):
         print("Pair")
@@ -171,28 +220,39 @@ async def repccConnect(request:Request):
 
     try:
 
-        print(macsYAML)
-
         if not macsYAML["MAC"] == None:
             if data["mac"] in macsYAML["MAC"]:
-                 # type: ignore
                 pair(data["mac"], request.client.host, macsYAML) # type: ignore
-                logger.debug("main | Connect request accepted due to saved MAC")
+                logger.info("main | Connect request accepted due to saved MAC")
                 sendNotification("RePCC Connection", f"Device {request.client.host} connected.") # type: ignore
                 return JSONResponse({"message":"Accepted"}, status_code=200)
-
-        if int(data["2fa"]) == TWOFACODE:
-
-            NEW2FA()
-            print("Check 2fa")
             
-            logger.debug("main | Connect request accepted. New 2FA requested.")
+        if argsYAML["allowConnection"] == False:
+            print("Connect set to false, denied.")
+            logger.info("main | Attempted connection denied. allowConnection: False")
+            return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
+        
+        if len(macsYAML["MAC"]) == argsYAML["maxSavedMACs"]:
+            print("MAC limit, false.")
+            logger.info("main | Attempted connection denied. Length of saved MACs is at set limit.")
+            return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
+        
+        if len(macsYAML["IP"]) == argsYAML["maxSavedIPs"]:
+            print("IP limit, false.")
+            logger.info("main | Attempted connection denied. Limit of connections reached.")
+            return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
+
+        from args import TWOFACODE
+        if int(data["2fa"]) == int(TWOFACODE):
+            NEW2FA()
+            
+            logger.info("main | Connect request accepted. New 2FA requested.")
             pair(data["mac"], request.client.host, macsYAML) # type: ignore[attr-defined]
 
             if MDNS and SERVICEINFO:
                 SERVICEINFO.properties["2fa"] = str(TWOFACODE) # type: ignore[attr-defined]
                 MDNS.update_service(SERVICEINFO)
-                logger.debug("main | Updated mDNS service with new 2FA code")
+                logger.info("main | Updated mDNS service with new 2FA code")
 
             sendNotification("RePCC Connection", f"Device {request.client.host} connected and paired.") # type: ignore
             return JSONResponse({"message":"Accepted and paired."}, status_code=200)
@@ -274,13 +334,13 @@ def tray_main():
 
 def wipeSavedIPs():
 
-    logger.debug("main | removing saved IPs from previous session...")
+    logger.info("main | removing saved IPs from previous session...")
 
     register = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml", "r"))
     register["IP"] = None
 
     yaml.safe_dump(register, open(ROAMING+"\\.RePCC\\settings\\register.yaml", "w"))
-    logger.debug(f"main | IPs wiped. Registry data: {register}")
+    logger.info(f"main | IPs wiped. Registry data: {register}")
 
 #   --------------- MAIN 
 
