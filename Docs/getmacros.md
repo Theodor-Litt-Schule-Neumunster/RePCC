@@ -20,7 +20,7 @@ http://127.0.0.1:15248/macro/getall
 Return: 
 ```json
 {
-    "macros" = [
+    "macros" : [
         "mouseMove",
         "example"
     ]
