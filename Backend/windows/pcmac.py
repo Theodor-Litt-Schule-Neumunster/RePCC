@@ -94,8 +94,6 @@ class macro():
         pass
 
         self.kill = False
-        self.pressedkeys = set()
-        self.presscombo = {"Key.esc", "'x'"}
 
         self.listener = None
 
@@ -112,13 +110,6 @@ class macro():
         sendNotification("Macro help", "Press CONTROL and K at the same time to stop the macro.")
 
         def press(key):
-
-            print(str(key))
-            self.pressedkeys.add(str(key))
-            print(self.pressedkeys)
-            print(self.presscombo)
-            print()
-
             if str(key) == "'\\x0b'": # CTRL + K  
                 print("Combo")
                 logger.info("Keycombo pressed, killing macro.")
