@@ -151,11 +151,10 @@ def requestsInit():
                         logger.error(customerror("main", "Cannot run a macro if IP is not registered."))
                         return JSONResponse({"error":"Not allowed"}, status_code=405)
 
-                    with open(PATHMACRO, "r") as f:
-                        
-                        macroData = json.load(f)
+                    if macroHandler.verifyStructure(PATHMACRO):
+                        threading.Thread(target=macroHandler.runMacro, args=(name,)).start()
 
-                    print(macroData)
+                        return JSONResponse({"message":"Great success!"}, status_code=200)
 
                     # TODO: FINISH INTEGRATION
 
@@ -232,15 +231,17 @@ async def repccConnect(request:Request):
             logger.info("main | Attempted connection denied. allowConnection: False")
             return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
         
-        if len(macsYAML["MAC"]) == argsYAML["maxSavedMACs"]:
-            print("MAC limit, false.")
-            logger.info("main | Attempted connection denied. Length of saved MACs is at set limit.")
-            return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
+        if not macsYAML["MAC"] == None:
+            if len(macsYAML["MAC"]) == argsYAML["maxSavedMACs"]:
+                print("MAC limit, false.")
+                logger.info("main | Attempted connection denied. Length of saved MACs is at set limit.")
+                return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
         
-        if len(macsYAML["IP"]) == argsYAML["maxSavedIPs"]:
-            print("IP limit, false.")
-            logger.info("main | Attempted connection denied. Limit of connections reached.")
-            return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
+        if not macsYAML["IP"] == None:
+            if len(macsYAML["IP"]) == argsYAML["maxSavedIPs"]:
+                print("IP limit, false.")
+                logger.info("main | Attempted connection denied. Limit of connections reached.")
+                return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
 
         from args import TWOFACODE
         if int(data["2fa"]) == int(TWOFACODE):
@@ -260,6 +261,8 @@ async def repccConnect(request:Request):
         return ValueError("2fa mismatch & no entry in connected MACs")
 
     except Exception as e:
+        logger.error("main | ERROR @ main.py/repccConnect")
+        logger.error(customerror("main", e))
         return JSONResponse({"Error":str(e)}, status_code=404)
 
 def registerMDNS(port:int = 15250):
@@ -343,6 +346,9 @@ def wipeSavedIPs():
     logger.info(f"main | IPs wiped. Registry data: {register}")
 
 #   --------------- MAIN 
+
+# TODO:
+# - YAML DEBUG: Integrage verbose level for notifications and debug bool idk
 
 if __name__ == "__main__":
 
