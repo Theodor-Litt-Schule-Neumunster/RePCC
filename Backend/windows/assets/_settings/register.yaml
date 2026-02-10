@@ -1,4 +1,7 @@
-MAC:
-
-IP:
-  
+MAC: Null
+IP: Null
+ARGS:
+  allowMacroExecution: true
+  allowConnection: true
+  maxSavedMacs: 10
+  maxSavedIPs: 10

@@ -48,11 +48,20 @@
         let pc = null
         let dc = null
 
+        var refreshrate = 30
+
         let lastupdate = 0
 
         async function connect() {
             const serverUrl = document.getElementById('serverUrl').value;
             const status = document.getElementById('status');
+
+            r = await fetch(serverUrl+'/refreshrate')
+            d = await r.json()
+
+            console.log(d)
+            refreshrate = d[0]
+            console.log("FPS: " + refreshrate)
             
             try {
                 status.textContent = 'Connecting...'
@@ -88,7 +97,6 @@
                 });
 
                 const answer = await response.json();
-                console.log('Answer SDP:', answer.sdp);
                 await pc.setRemoteDescription(new RTCSessionDescription({
                     type: "answer",
                     sdp: answer.sdp
@@ -120,7 +128,7 @@
                     if (dc && dc.readyState === "open") {
                         const now = performance.now()
 
-                        if (now - lastupdate >= 1000/30) {
+                        if (now - lastupdate >= 1000/refreshrate) {
                             lastupdate = now
                             const rect = videoArea.getBoundingClientRect()
                             const x = (ev.clientX - rect.left) / rect.width

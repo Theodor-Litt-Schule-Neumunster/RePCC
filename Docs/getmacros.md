@@ -35,7 +35,7 @@ Hin und wieder möchte man gucken, was in einem Macro ist. Z.B vor der Ausführu
 
 Die Request hat 2 methoden:
 - DATA
-    > Hier werden alle Daten vom Macro zurückgegeben. Die genaue Struktur von einem Macro findet man in [/Backend/windows/base/structure.json](..\Backend\windows\base\structure.json)
+    > Hier werden alle Daten vom Macro zurückgegeben. Die genaue Struktur von einem Macro findet man in /Backend/windows/base/structure.json
 - CHECK
     > Hier wird nur geguckt, ob der Macro exsistiert. Wenn der Macro mit dem Namen auf dem PC exsistiert, wird CODE 200 (OK) Returned, sonnst 404 (NOT FOUND).
 

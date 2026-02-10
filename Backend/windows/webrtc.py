@@ -10,7 +10,8 @@ import asyncio
 import threading
 import logging.config
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
@@ -81,9 +82,20 @@ class RePCC_VideoStream(VideoStreamTrack):
 
 pcs = set()
 
+@App.get("/refreshrate")
+async def getrefresh(request: Request):
+
+    loaded_presentsettings = yaml.safe_load(open(SETTINGS+"presentationTools.yaml"))
+    refreshrate = loaded_presentsettings["laserpointer"].get("refreshrate", 30)
+    return JSONResponse([int(refreshrate)], status_code=200)
+
 @App.post("/offer")
 async def offer(request: OfferRequest):
     try:
+
+        loaded_presentsettings = yaml.safe_load(open(SETTINGS+"presentationTools.yaml"))
+        refreshrate = loaded_presentsettings["laserpointer"].get("refreshrate", 30)
+
         offer = RTCSessionDescription(sdp=request.sdp, type=request.type)
         pc = RTCPeerConnection()
         pcs.add(pc)
@@ -100,7 +112,7 @@ async def offer(request: OfferRequest):
                 async def on_message(message):
                     try:
                         currenttime = time.time()
-                        if currenttime - lastupdate >= 1/30:
+                        if currenttime - lastupdate >= 1/refreshrate:
                             currenttime = lastupdate
                             data = json.loads(message)
                             pos = LaserPos(x=data["x"], y=data["y"])

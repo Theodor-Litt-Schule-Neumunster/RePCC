@@ -76,7 +76,9 @@ class LaserOverlay(QWidget):
         self.trail = deque(maxlen=20)
 
         cc = tuple(loaded_settings["laserpointer"].get("corecolor", [255, 0, 0, 0]))
-        self.coreColor = QColor(cc[0], cc[1], cc[2], cc[3])
+        self.coreColor = QColor(int(cc[0]), int(cc[1]), int(cc[2]), int(cc[3]))
+
+        self.coreSize = loaded_settings["laserpointer"].get("size", 8)
 
         self.positionUpdate.connect(self._updatePosInternal)
 
@@ -132,8 +134,8 @@ class LaserOverlay(QWidget):
         if self.opacity <= 0:
             return
 
-        glowradius = 30
-        coreradius = 8
+        glowradius = self.coreSize * 4
+        coreradius = self.coreSize
 
         style = self.loaded_settings["laserpointer"].get("style", "default")
 
@@ -145,10 +147,16 @@ class LaserOverlay(QWidget):
         if style == "default":
 
             gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
-            gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
-            gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
-            gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
-            gradient.setColorAt(1, self.coreColor)
+            gradient.setColorAt(0, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(150* self.opacity))
+                )
+            gradient.setColorAt(.3, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(100* self.opacity))
+                )
+            gradient.setColorAt(.6, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(50* self.opacity))
+                )
+            gradient.setColorAt(1, QColor(255, 255, 255, 0))
 
             painter.setBrush(gradient)
             painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
@@ -156,8 +164,11 @@ class LaserOverlay(QWidget):
 
             coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
             coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
-            coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
-            coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
+            coregradient.setColorAt(0.5, QColor(
+                self.coreColor.red()//2, self.coreColor.green()//2, self.coreColor.blue()//2, 
+                int(240* self.opacity)))
+            coregradient.setColorAt(1, QColor(
+                self.coreColor.red()//3, self.coreColor.green()//3, self.coreColor.blue()//3, int(200* self.opacity)))
 
             painter.setBrush(coregradient)
             painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
@@ -175,19 +186,29 @@ class LaserOverlay(QWidget):
                     continue
 
                 gradient = QRadialGradient(tx, ty, trail_glowradius)
-                gradient.setColorAt(0, QColor(255, 0, 0, int(180 * trail_opacity)))
-                gradient.setColorAt(.3, QColor(255, 50, 0, int(120 * trail_opacity)))
-                gradient.setColorAt(.6, QColor(255, 100, 0, int(60 * trail_opacity)))
-                gradient.setColorAt(1, QColor(255, 0, 0, 0))
+                gradient.setColorAt(0, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(180 * trail_opacity)))
+                gradient.setColorAt(.3, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(120 * trail_opacity)))
+                gradient.setColorAt(.6, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(60 * trail_opacity)))
+                gradient.setColorAt(1, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), 0))
                 painter.setBrush(gradient)
                 painter.drawEllipse(int(tx - trail_glowradius), int(ty - trail_glowradius),
                     int(trail_glowradius * 2), int(trail_glowradius * 2)) 
 
             gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
-            gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
-            gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
-            gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
-            gradient.setColorAt(1, QColor(255, 0, 0, 0))
+            gradient.setColorAt(0, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(150* self.opacity))
+                )
+            gradient.setColorAt(.3, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(100* self.opacity))
+                )
+            gradient.setColorAt(.6, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(50* self.opacity))
+                )
+            gradient.setColorAt(1, QColor(255, 255, 255, 0))
 
             painter.setBrush(gradient)
             painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
@@ -195,15 +216,17 @@ class LaserOverlay(QWidget):
 
             coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
             coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
-            coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
-            coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
-            
+            coregradient.setColorAt(0.5, QColor(
+                self.coreColor.red()//2, self.coreColor.green()//2, self.coreColor.blue()//2, 
+                int(240* self.opacity)))
+            coregradient.setColorAt(1, QColor(50, 50, 50, int(200* self.opacity)))
+
             painter.setBrush(coregradient)
             painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
                 coreradius * 2, coreradius * 2)
 
         elif style == "simple":
-            painter.setBrush(QColor(255, 0, 0, 255))
+            painter.setBrush(self.coreColor)
             painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
                 coreradius * 2, coreradius * 2)
 
@@ -236,7 +259,7 @@ def _qt_loop():
     
     # Create overlay in the Qt thread
     overlay = LaserOverlay()
-    logger.debug("Laser | Overlay started successfully.")
+    logger.info("Laser | Overlay started successfully.")
     overlay_ready.set()  # Signal that overlay is ready
     
     sys.exit(App.exec_())
@@ -250,7 +273,7 @@ async def StartLaserpointer() -> tuple[bool, str]:
     """
     global overlay, overlay_ready
 
-    logger.debug("Laser | Starting overlay...")
+    logger.info("Laser | Starting overlay...")
 
     try:
         if overlay is None:
@@ -263,7 +286,7 @@ async def StartLaserpointer() -> tuple[bool, str]:
                 return (False, "Timeout waiting for overlay to start")
         
         else:
-            logger.debug("Laser | Can only run one overlay at a time.")
+            logger.info("Laser | Can only run one overlay at a time.")
 
         return (True, "Great success!")
     except Exception as e:
@@ -302,7 +325,7 @@ async def ClearLaserpointer() -> tuple[bool, str]:
     """
     global overlay
 
-    logger.debug("Laser | Killed overlay.")
+    logger.info("Laser | Killed overlay.")
 
     try:
         if overlay is not None:
