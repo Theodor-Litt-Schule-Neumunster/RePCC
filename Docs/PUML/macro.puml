@@ -1,0 +1,53 @@
+@startuml MacroRun
+
+title Macro - Ausführung
+
+actor User as Benutzer
+participant "runMacro" as run
+participant "KeyListener" as listener
+participant "Handler" as handler
+
+== Start ==
+
+Benutzer -> run: runMacro(MacroName)
+activate run
+
+run -> run: Prüfe ob Macro existiert
+
+alt Macro nicht gefunden
+    run --> Benutzer: ValueError
+end
+
+run -> run: Macro öffnen & laden
+
+opt $data Block vorhanden
+    run -> run: Parameter extrahieren\n(isLoop, amtLoops)
+end
+
+== Ausführung ==
+
+run -> listener: KeyListener starten (CTRL+K)
+activate listener
+
+loop Für jeden Schritt
+    run -> run: sleep() warten
+    
+    alt Mausbewegung
+        run -> handler: handler_mousemove()
+    else Mausklick
+        run -> handler: handler_mouseclick()
+    else Tastatur
+        run -> handler: handler_keyboard()
+    end
+    
+    opt CTRL+K gedrückt
+        listener --> run: kill = True
+        run -> run: Abbruch
+    end
+end
+
+run --> Benutzer: Fertig
+deactivate listener
+deactivate run
+
+@enduml

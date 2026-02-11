@@ -94,7 +94,6 @@ class macro():
         pass
 
         self.kill = False
-
         self.listener = None
 
     def wait(self, time_ms:int|float):
@@ -123,13 +122,13 @@ class macro():
         self.listenerThread = threading.Thread(target=self._keybindListener, daemon=True)
         self.listenerThread.start()
 
-    def verifyStructure(self, jsonFilePath:str, v:bool=False) -> bool:
+    def verifyStructure(self, jsonFilePathOrJSONdata:str|dict) -> bool:
         """
         Verifies the structure for a macro.\n
         Essential to check if it will cause issues when running.
         
-        :param jsonFilePath: the filepath to the JSON file.
-        :type jsonFilePath: str
+        :param jsonFilePathOrJSONdata: the filepath to the JSON file or JSON data.
+        :type jsonFilePathOrJSONdata: str | dict
         :param v: makes the function verbose if set to True. Default is False
         :type v: bool
         :return: Returns True if the stucture is valid for macros, false if not.
@@ -139,18 +138,28 @@ class macro():
         # refer to ./bases/structure.json to see macro structure.
 
         data = None
+        datatype = "PATH"
+
+        if not os.path.exists(str(jsonFilePathOrJSONdata)): # type: ignore
+            datatype = "JSON"
 
         try:
-            logger.info("pcmac | Atempting to open file to verify the structure...")
-            with open(jsonFilePath, "r") as f:
+            if datatype == "PATH":
+                logger.info("pcmac | Atempting to open file to verify the structure...")
+                with open(jsonFilePathOrJSONdata, "r") as f: # type: ignore
 
-                data = json.load(f)
-                f.close()
+                    data = json.load(f)
+                    f.close()
 
-            logger.info("pcmac | Opened file successfully.")
+                logger.info("pcmac | Opened file successfully.")
+            
+            if datatype == "JSON":
+                data = jsonFilePathOrJSONdata # type: ignore
+                logger.info("pcmac | Recieved JSON to check")
 
         except Exception as e:
-            logger.error(f"pcmac | File open failed. {e}")
+            logger.error("pcmac | ERROR @ pcmac.py/macro/verifyStructure")
+            logger.error(customerror("pcmac", e))
 
             return False
         
@@ -278,6 +287,7 @@ Sleep is outside of range.
                 return True
                     
             except Exception as e:
+                logger.error("pcmac | ERROR @ pcmac.py/macro/verifyStructure")
                 logger.error(customerror("pcmac", e))
                 if e.__class__ == KeyError:
                     logger.error("pcmac | -> File does not contain essential keys. Might not be macro format.")
@@ -290,6 +300,20 @@ Sleep is outside of range.
 
         return False
 
+    def presenter(self, presenterKey:str):
+
+        def press(key):
+
+            keyboard = Controller()
+            keyboard.press(key)
+            time.sleep(.05)
+            keyboard.release(key)
+
+        key = SPECIAL_KEY_MAP.get(presenterKey, None)
+
+        if not key == None:
+            press(key)
+
     def runMacro(self, MacroName:str):
         """
         Runs a macro saved in roaming with its name.\n
@@ -300,11 +324,8 @@ Sleep is outside of range.
         :type v: bool
         """
 
-        print("run mac")
-
         param_isLoop = None # default if no isloop param is missing
         param_amtLoops = None
-
         kill = False
 
         def handler_data(data:dict):
@@ -346,7 +367,6 @@ Sleep is outside of range.
 
             steps = max(int(transitionTimeMS*60), 1)
             sleep_time = transitionTimeMS / steps
-            print(steps)
 
             for i in range(steps + 1):
 
@@ -370,7 +390,6 @@ Sleep is outside of range.
                         self.wait(sleep_time+0.005)
                 
                 else: 
-                    print("commiting suicide... (MOUSE MOVE)")
                     break
 
         def handler_mouseclick(button:int, pressSleep:int):
@@ -391,7 +410,6 @@ Sleep is outside of range.
                     win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0,0)
 
             else:
-                print("I'm KILLING myself im KILLLLIIINNNNGG myself (click)")
                 return
             
         def handler_keyboard(actiontype:str, keys:list, presssleep:int):
@@ -419,7 +437,6 @@ Sleep is outside of range.
                         keyboard.release(actual_key) # type: ignore[attr-defined]
                     
                     else:
-                        print("man im dead")
                         break
                 
             if actiontype == "multikey":
@@ -486,56 +503,45 @@ Sleep is outside of range.
                 handler_data(data["$data"])
                 logger.info(f"main | macro: extracted data: { data['$data'] }")
 
-            failsafe = 0
-
             try:
 
                 if param_isLoop == True:
                     self.startKeyListener()
                     while True:
 
-                        if self.kill or failsafe == 10: 
+                        if self.kill: 
                             if self.listener:
                                 self.listener.stop()
                             if self.listenerThread:
                                 self.listenerThread.join()
-
-                            print("kill inf")
                             break
 
-                        print("call")
                         run()
 
                 elif param_amtLoops > 1 and not param_amtLoops == None: # type: ignore[attr-defined]
                     self.startKeyListener()
-                    for i in range(int(param_amtLoops)): # type: ignore[attr-defined]
+                    for _ in range(int(param_amtLoops)): # type: ignore[attr-defined]
 
                         if self.kill: 
                             if self.listener:
                                 self.listener.stop()
                             if self.listenerThread:
                                 self.listenerThread.join()
-
-                            print("kill amnt")
                             break
 
-                        print("amt call")
-                        print(i+1)
                         run()
                         return
             except Exception:
-                print("Fail inside")
-
                 if not Exception.__class__ == KeyboardInterrupt:
 
                     self.startKeyListener()
-                    print("singleloop")
                     run()
 
             if self.kill: self.kill = False
             return
 
         except Exception as e:
+            logger.error("pcmac | ERROR @ pcmac.py/macro/runMacro")
             logger.error(customerror("pcmac", e))
 
 

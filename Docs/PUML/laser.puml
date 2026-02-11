@@ -1,0 +1,73 @@
+@startuml Laserpointer Ablauf
+
+title Laserpointer Steuerung
+
+Actor User as Caller
+participant "laser.py" as Laser
+participant "LaserOverlay" as Overlay
+participant "Qt Thread" as Qt
+
+== Laserpointer starten ==
+
+Caller -> Laser: StartLaserpointer()
+activate Laser
+alt Overlay existiert nicht
+    Laser -> Qt: Thread starten (_qt_loop)
+    activate Qt
+    Qt -> Qt: QApplication erstellen
+    Qt -> Overlay: LaserOverlay erstellen
+    activate Overlay
+    Overlay -> Overlay: Einstellungen laden
+    Overlay -> Overlay: Fenster konfigurieren\n(Vollbild, transparent)
+    Overlay -> Overlay: Klick-Durchlässigkeit aktivieren
+    Overlay -> Overlay: show()
+    Qt --> Laser: overlay_ready.set()
+    Laser --> Caller: (True, "Erfolg!")
+else Overlay existiert bereits
+    Laser --> Caller: Log: "Nur ein Overlay möglich"
+end
+deactivate Laser
+
+== Position aktualisieren ==
+
+Caller -> Laser: UpdateLaserpointer(pos)
+activate Laser
+alt Overlay bereit
+    Laser -> Overlay: updatePos(x, y)
+    Overlay -> Overlay: positionUpdate Signal senden
+    Overlay -> Overlay: _updatePosInternal()
+    Overlay -> Overlay: Bildschirmposition berechnen
+    Overlay -> Overlay: Trail aktualisieren
+    Overlay -> Overlay: fadeout_reset()
+    Overlay -> Overlay: repaint()
+    Laser --> Caller: (True, "Position aktualisiert")
+else Overlay nicht bereit
+    Laser --> Caller: (False, "Overlay nicht bereit")
+end
+deactivate Laser
+
+== Ausblenden (Fadeout) ==
+
+Overlay -> Overlay: Inaktivitäts-Timer abgelaufen
+Overlay -> Overlay: fadeout_start()
+loop Opacity > 0
+    Overlay -> Overlay: fadeout_step()
+    Overlay -> Overlay: Opacity verringern
+    Overlay -> Overlay: repaint()
+end
+
+== Laserpointer beenden ==
+
+Caller -> Laser: ClearLaserpointer()
+activate Laser
+alt Overlay existiert
+    Laser -> Overlay: close()
+    deactivate Overlay
+    Laser -> Laser: overlay = None
+    Laser --> Caller: (True, "Overlay gelöscht")
+else Overlay existiert nicht
+    Laser --> Caller: (True, "Overlay gelöscht")
+end
+deactivate Laser
+
+@enduml

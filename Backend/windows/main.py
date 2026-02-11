@@ -26,7 +26,10 @@ from zeroconf import Zeroconf, ServiceInfo
 # custom imports
 from pcmac import initializePCMAC, macro
 from webrtc import startWebRTCServer
-from args import LOGGER_CONF, NEW2FA, customerror, forceLogFolder,  assetsPath,  sendNotification
+
+# Multiline because it was getting a little too long
+from args import LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath
+from args import sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost
 
 # --
 
@@ -70,18 +73,31 @@ def requestsInit():
     def _macroRequests():
 
         @App.get("/macro/getall")
-        async def macros_getall(request:Request):
+        async def macros_getall(request:Request): # NOTE: Has IP check now
+
+            logger.info(f"main | getall request recieded by {request.client.host}") #type: ignore
+
+            if not findRegisteredHost(request.client.host): #type: ignore
+                logger.error("main | ERROR @ main.py/requestsInit/_macroRequests/macros_getall")
+                logger.error("main | Unauthorized host attempted to access macros_getall.")
+                return JSONResponse({"error":"Not allowed"}, status_code=405)
+            
             logger.info("main | getall request recieded.")
             lis = [str(x)[:-6] for x in os.listdir(ROAMING+"\\.RePCC\\macros")]
             return JSONResponse({"macros":lis}, status_code=200)
 
         @App.get("/macro/get/{name}")
-        async def macros_getone(request:Request, name:str): #type: ignore
-            logger.info("main | getone request recieded.")
+        async def macros_getone(request:Request, name:str): # NOTE: Has IP check now
+            logger.info(f"main | getone request recieded by {request.client.host}") #type: ignore
+
+            if not findRegisteredHost(request.client.host): #type: ignore
+                logger.error("main | ERROR @ main.py/requestsInit/_macroRequests/macros_getone")
+                logger.error("main | Unauthorized host attempted to access macros_getone.")
+                return JSONResponse({"error":"Not allowed"}, status_code=405)
             try:
                 data = await request.json()
-
                 method = data.get("METHOD", None)
+
                 if not method == None and not name == None:
 
                     PATH = ROAMING+"\\.RePCC\\macros\\"+name
@@ -90,7 +106,6 @@ def requestsInit():
                         PATH = PATH + ".pcmac"
 
                     if method == "DATA":
-
                         if os.path.exists(PATH):
 
                             macrodata = None
@@ -105,12 +120,8 @@ def requestsInit():
                     if method == "CHECK":
                         
                         if os.path.exists(PATH):
-                            print("exists")
                             return JSONResponse({}, status_code=200)
-                        
-                        print("no")
                         return JSONResponse({}, status_code=404)
-                    
                     return JSONResponse({"error":"Method is not DATA or CHECK"}, status_code=403)
                 else:
                     return JSONResponse({"error":"Method is not in JSON"}, status_code=403)
@@ -119,14 +130,13 @@ def requestsInit():
                 return JSONResponse({"error":str(e)}, status_code=403)
 
         @App.get("/macro/run/{name}")
-        async def macros_run(request:Request, name:str):
+        async def macros_run(request:Request, name:str): # NOTE: Has IP check now
             if name:
 
                 if not name[-6:] == ".pcmac":
                     name = name+".pcmac"
 
                 PATHMACRO = ROAMING + "\\.RePCC\\macros\\" + name
-                PATHYAML = ROAMING + "\\.RePCC\\settings\\register.yaml"
 
                 if not os.path.exists(PATHMACRO):
                     logger.error(customerror("main", "Attemted to run macro that does not exist."))
@@ -134,29 +144,15 @@ def requestsInit():
                 
                 try:
                     macroHandler = macro()
-                    macroData = None
 
-                    registerYAML = yaml.safe_load(open(PATHYAML))
-                    if registerYAML["IP"] == None:
-                        logger.error(customerror("main", "Cannot run a Macro if no IPs are registered."))
-                        return JSONResponse({"error":"Not allowed"}, status_code=405)
-                    
-                    found = False
-                    for key in registerYAML["IP"]:
-                        if registerYAML["IP"][key] == request.client.host: # type: ignore
-                            found = True
-                            break
-
-                    if found == False:
-                        logger.error(customerror("main", "Cannot run a macro if IP is not registered."))
+                    if not findRegisteredHost(request.client.host): #type: ignore
                         return JSONResponse({"error":"Not allowed"}, status_code=405)
 
                     if macroHandler.verifyStructure(PATHMACRO):
                         threading.Thread(target=macroHandler.runMacro, args=(name,)).start()
-
                         return JSONResponse({"message":"Great success!"}, status_code=200)
-
-                    # TODO: FINISH INTEGRATION
+                    
+                    return JSONResponse({"error":"Macro structure is not ok"}, status_code=400)
 
                 except Exception as e:
                     logger.error("main | ERROR @ main.py/_macroRequests/macros_run")
@@ -166,18 +162,73 @@ def requestsInit():
                 customerror("main", "Attempted to run macro without parsing name.")
                 return JSONResponse({"error":"Running needs a name parsed."}, status_code=405)
 
-        @App.post("macro/save")
-        async def macros_save(request:Request):
+        @App.post("/macro/save")
+        async def macros_save(request:Request): # NOTE: Has IP check now
+
+            logger.info(f"main | save macro post request recieded by {request.client.host}") #type: ignore
+
+            if not findRegisteredHost(request.client.host): #type: ignore
+                logger.error("main | ERROR @ main.py/requestsInit/_macroRequests/macros_save")
+                logger.error("main | Unauthorized host attempted to access macros_save.")
+                return JSONResponse({"error":"Not allowed"}, status_code=405)
+
+            try:
+                def verifyName(name:str):
+
+                    nameSuffix = ""
+                    i = 0
+
+                    while True:
+                        print(f"{name}{nameSuffix}.pcmac")
+                        if not os.path.exists(ROAMING+f"\\.RePCC\\macros\\{name}{nameSuffix}.pcmac"):
+                            name = f"{name}{nameSuffix}.pcmac"
+                            break
+                        
+                        i=i+1
+                        nameSuffix = f"({i})"
+
+                    return name
+
+                jsonData = await request.json()
+                if "name" in jsonData and "macro" in jsonData:
+                    
+                    macrohandler = macro()
+                    if macrohandler.verifyStructure(jsonData["macro"]):
+                        name = verifyName(jsonData["name"])
+
+                        with open(ROAMING+"\\.RePCC\\macros\\"+name, "w") as f:
+                            json.dump(jsonData["macro"], f, indent=5)
+                            f.close()
+
+                        sendNotification("Macro update", f"New macro \"{name}\" has been added.")
+                        logger.info(f"main | New macro \"{name}\" has been added to Roaming\\.RePCC\\macros")
+                        return JSONResponse({"message":"New macro saved."}, status_code=200)
+
+            except json.decoder.JSONDecodeError as e:
+                logger.error("main | JSONDECODE ERROR @ main.py/reqiestsInit/_macroRequests/macros_save")
+                logger.error(customerror("main", e))
+                return JSONResponse({"error":str(e)}, status_code=500)
+
+        @App.get("/macro/presenter/{direction}")
+        async def macros_presenter_back(request:Request, direction:str):
+
+            logger.info(f"main | presenter request recieded by {request.client.host}") #type: ignore
+
+            if not findRegisteredHost(request.client.host): #type: ignore
+                logger.error("main | ERROR @ main.py/requestsInit/_macroRequests/macros_presenter_back")
+                logger.error("main | Unauthorized host attempted to access macros_presenter_back.")
+                return JSONResponse({"error":"Not allowed"}, status_code=405)
             
-            # TODO: 
-            # - Check if JSON is parsed
-            # - Send JSON to CheckFile in PCMAC
-            # - If its fine, check if file with name exsists
-            # - If file name exsists, add a 1 to the end.
-            # - Another file check, recursive. If also exsists, send it off again for 2 at the end and new name check
-            # - Write file and filename as new .pcmac file.
-            # - Send notification on PC to notify PC user that new macro has been created.
-            ...
+            presentationYaml = getPresentationSettings()
+            buttons = presentationYaml["buttons"]
+            key = buttons.get(direction, None)
+
+            if not key == None:
+                macroHandler = macro()
+                macroHandler.presenter(key)
+                return JSONResponse({}, status_code=200)
+            
+            return JSONResponse({"error":"Key not found."}, status_code=404)
 
         logger.info("main | macro requests init finished.")
 
@@ -289,12 +340,6 @@ def registerMDNS(port:int = 15250):
     zc.register_service(serviceinfo)
     return zc, serviceinfo
 
-#   --------------- SETTINGS 
-
-@App.get("settings/{file}")
-async def getSetting(file:str):
-    ...
-
 #   --------------- MENU TRAY
 
 def tray_main():
@@ -349,6 +394,10 @@ def wipeSavedIPs():
 
 # TODO:
 # - YAML DEBUG: Integrage verbose level for notifications and debug bool idk
+# - Finish Tray icon integration
+# - Start settings requests
+# - Fix trail from laserpointer not disappearing when let go
+# - Add variable trail length in settings
 
 if __name__ == "__main__":
 

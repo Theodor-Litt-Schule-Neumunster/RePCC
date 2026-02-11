@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import yaml
 import random
 import logging
 import threading
@@ -113,3 +114,51 @@ def sendNotification(title:str, body:str):
 
     threading.Thread(target=_).start()
 
+def getDebugSettings() -> dict:
+    """
+    Fetches the settings for DEBUG yaml in user roaming.
+    """
+
+    yamlfile = ROAMING+"\\.RePCC\\settings\\debug.yaml"
+
+    load = yaml.safe_load(open(yamlfile))
+    return load
+
+def getRegistryYaml() -> dict:
+    """
+    Fetches the entries for REGISTRY yaml in user roaming.
+    """
+    yamlfile = ROAMING+"\\.RePCC\\settings\\register.yaml"
+
+    load = yaml.safe_load(open(yamlfile))
+    return load
+
+def getPresentationSettings() -> dict:
+    """
+    Fetches the settings for PRESENTATIONTOOLS yaml in user roaming.
+    """
+
+    yamlfile = ROAMING+"\\.RePCC\\settings\\presentationTools.yaml"
+
+    load = yaml.safe_load(open(yamlfile))
+    return load
+
+def findRegisteredHost(ip:str) -> bool:
+    registerYAML = getRegistryYaml()
+    debugYAML = getDebugSettings()
+
+    _debug_allowExternal = debugYAML.get("allowExternalRequests", False)
+
+    if registerYAML["IP"] == None and _debug_allowExternal == False:
+        return False
+                    
+    found = False
+    for key in registerYAML["IP"]:
+        if registerYAML["IP"][key] == ip or _debug_allowExternal == True: 
+            found = True
+            break
+
+    if found:
+        return True
+    
+    return False
