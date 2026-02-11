@@ -73,7 +73,7 @@ class LaserOverlay(QWidget):
         self.dot_x = screen.width() // 2
         self.dot_y = screen.height() // 2
 
-        self.trail = deque(maxlen=20)
+        self.trail = deque(maxlen=20) # TODO: LOAD FROM SETTINGS!!!
 
         cc = tuple(loaded_settings["laserpointer"].get("corecolor", [255, 0, 0, 0]))
         self.coreColor = QColor(int(cc[0]), int(cc[1]), int(cc[2]), int(cc[3]))

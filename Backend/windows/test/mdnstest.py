@@ -1,9 +1,24 @@
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 
 import uuid
+import json
+import time
 import requests
 
 class TestListener(ServiceListener):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        PATH = r"C:\Users\mark\AppData\Roaming\.RePCC\macros\macro.pcmac"
+        self.DATA = None
+
+        with open(PATH, "r") as f:
+            
+            self.DATA = json.load(f)
+            f.close()
+
+        print(self.DATA)
 
     def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         print(f"Service {name} updated")
@@ -17,6 +32,7 @@ class TestListener(ServiceListener):
         self._handle_Service(zc, type_, name)
 
     def _handle_Service(self, zc: Zeroconf, type_:str, name:str):
+
         info = zc.get_service_info(type_, name)
 
         if info and "repcc" in name.lower():
@@ -31,6 +47,7 @@ class TestListener(ServiceListener):
             twofa = props[b"2fa"].decode('utf-8') # type: ignore
 
             addr = f"http://{ip}:15248/connect"
+            save = f"http://{ip}:15248/macro/save"
             print(props)
 
             r = requests.post(url=addr, json={
@@ -40,6 +57,11 @@ class TestListener(ServiceListener):
 
             if r.status_code == 202 or r.status_code == 200:
                 print("OK!")
+
+                time.sleep(3)
+                print("Send")
+                r = requests.post(url=save, json={"name":"macro", "macro":self.DATA})
+                print(r.status_code)
             else:
                 print(f"Response is not 202. Code: {r.status_code}")
 

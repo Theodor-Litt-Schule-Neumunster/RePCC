@@ -1,0 +1,51 @@
+@startuml MacroClass
+
+title Macro Klasse
+
+class macro {
+    -- Attribute --
+    - kill: bool
+    - listener: Listener
+    - listenerThread: Thread
+    
+    -- Methoden --
+    + __init__()
+    + wait(time_ms: int|float)
+    - _keybindListener()
+    + startKeyListener()
+    + verifyStructure(jsonFilePathOrJSONdata: str|dict): bool
+    + runMacro(MacroName: str)
+}
+
+class "runMacro (intern)" as runMacroIntern {
+    -- Lokale Funktionen --
+    - handler_data(data: dict)
+    - handler_mousemove(x: float, y: float, time: float, transition: str)
+    - handler_mouseclick(button: int, pressSleep: int)
+    - handler_keyboard(actiontype: str, keys: list, presssleep: int)
+    - run()
+}
+
+macro *-- runMacroIntern : enthält
+
+note right of runMacroIntern::handler_data
+    Extrahiert isLoop
+    und amtLoops
+end note
+
+note right of runMacroIntern::handler_mousemove
+    Unterstützt linear
+    und quadratic Easing
+end note
+
+note right of runMacroIntern::handler_mouseclick
+    0 = Linksklick
+    1 = Rechtsklick
+end note
+
+note right of runMacroIntern::handler_keyboard
+    singlekey: Einzelne Tasten
+    multikey: Tastenkombination
+end note
+
+@enduml

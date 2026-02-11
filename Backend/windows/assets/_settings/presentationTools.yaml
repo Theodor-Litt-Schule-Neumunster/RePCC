@@ -6,3 +6,8 @@ laserpointer:
   - 0     # G
   - 0     # B
   - 0     # A
+  refreshrate: 30
+  traillength: 20
+buttons:
+  forward: right
+  backward: left

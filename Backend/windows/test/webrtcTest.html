@@ -3,6 +3,20 @@
 <head>
     <title>RePCC WebRTC Screen Share</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            -webkit-overflow-scrolling: none;
+            overscroll-behavior: none;
+        }
         body {
             font-family: Arial;
             display: flex;
@@ -17,6 +31,9 @@
             max-width: 1200px;
             border: 2px solid #444;
             margin-top: 20px;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         button {
             padding: 10px 20px;
@@ -39,8 +56,12 @@
 </head>
 <body>
     <h1>RePCC Screen Share</h1>
-    <input type="text" id="serverUrl" value="http://127.0.0.1:15249" placeholder="Server URL">
+    <input type="text" id="serverUrl" value="http://192.168.178.15:15249" placeholder="Server URL">
     <button onclick="connect()">Connect</button>
+    <div id="controls" style="margin-top: 15px;">
+        <button onclick="presenterBack()" style="margin-right: 10px;">Back</button>
+        <button onclick="presenterForward()">Forward</button>
+    </div>
     <video autoplay playsinline></video>
     <div id="status">Disconnected</div>
 
@@ -51,6 +72,32 @@
         var refreshrate = 30
 
         let lastupdate = 0
+
+        function getMainServerUrl() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            // Replace WebRTC port (15249) with main server port (15248)
+            return serverUrl.replace(':15249', ':15248');
+        }
+
+        async function presenterBack() {
+            try {
+                const response = await fetch(getMainServerUrl() + '/macro/presenter/backward');
+                const data = await response.json();
+                console.log('Back:', data);
+            } catch (error) {
+                console.error('Presenter back error:', error);
+            }
+        }
+
+        async function presenterForward() {
+            try {
+                const response = await fetch(getMainServerUrl() + '/macro/presenter/forward');
+                const data = await response.json();
+                console.log('Forward:', data);
+            } catch (error) {
+                console.error('Presenter forward error:', error);
+            }
+        }
 
         async function connect() {
             const serverUrl = document.getElementById('serverUrl').value;
@@ -113,6 +160,10 @@
 
             const videoArea = document.querySelector("video")
 
+            // Prevent default touch behaviors
+            document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false })
+
+            // Mouse events
             videoArea.addEventListener("mousedown", (MD_ev) => {
 
                 console.log("DOWN!")
@@ -143,6 +194,52 @@
                 videoArea.addEventListener("mousemove", mouseMoveEvent)
                 document.addEventListener("mouseup", mouseUpEvent)
             })
+
+            // Touch events for mobile
+            videoArea.addEventListener("touchstart", (TS_ev) => {
+                TS_ev.preventDefault()
+                console.log("TOUCH START!")
+
+                function touchEndEvent(ev) {
+                    console.log("TOUCH END!")
+                    videoArea.removeEventListener("touchmove", touchMoveEvent)
+                    document.removeEventListener("touchend", touchEndEvent)
+                    document.removeEventListener("touchcancel", touchEndEvent)
+                }
+
+                function touchMoveEvent(ev) {
+                    ev.preventDefault()
+                    if (dc && dc.readyState === "open") {
+                        const now = performance.now()
+
+                        if (now - lastupdate >= 1000/refreshrate) {
+                            lastupdate = now
+                            const touch = ev.touches[0]
+                            const rect = videoArea.getBoundingClientRect()
+                            const x = (touch.clientX - rect.left) / rect.width
+                            const y = (touch.clientY - rect.top) / rect.height
+                            dc.send(JSON.stringify({x:x,y:y}))
+                            console.log("Touch:", x, y)
+                        }
+                    }
+                }
+
+                // Send initial touch position
+                if (TS_ev.touches.length > 0) {
+                    const touch = TS_ev.touches[0]
+                    const rect = videoArea.getBoundingClientRect()
+                    const x = (touch.clientX - rect.left) / rect.width
+                    const y = (touch.clientY - rect.top) / rect.height
+                    if (dc && dc.readyState === "open") {
+                        dc.send(JSON.stringify({x:x,y:y}))
+                        console.log("Touch start:", x, y)
+                    }
+                }
+
+                videoArea.addEventListener("touchmove", touchMoveEvent, { passive: false })
+                document.addEventListener("touchend", touchEndEvent)
+                document.addEventListener("touchcancel", touchEndEvent)
+            }, { passive: false })
         })
     </script>
 </body>

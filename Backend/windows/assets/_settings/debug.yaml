@@ -1,1 +1,3 @@
-debug: false
+debug: false # NOT YET IMPLEMENTED
+verbose: 0 # NOT YET IMPLEMENTED
+allowExternalRequests: true
