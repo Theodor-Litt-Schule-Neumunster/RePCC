@@ -28,7 +28,7 @@ from pcmac import initializePCMAC, macro
 from webrtc import startWebRTCServer
 
 # Multiline because it was getting a little too long
-from args import LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath
+from args import LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath, getSetting
 from args import sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost
 
 # --
@@ -58,7 +58,7 @@ def requestsInit():
     @App.get("/ping")
     async def ping(request:Request):
 
-        macsYaml = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
+        macsYaml = getRegistryYaml()
 
         if not macsYaml["IP"] == None:
             if request.client.host in macsYaml["IP"]: # type: ignore[attr-defined]
@@ -233,9 +233,58 @@ def requestsInit():
         logger.info("main | macro requests init finished.")
 
     def _settingsRequests():
-        ...
+        
+        @App.get("/settings/get/{arg}")
+        async def settings_get(request:Request, arg:str):
 
+            if not findRegisteredHost(request.client.host): # type: ignore
+                logger.error("main | ERROR @ main.py/requestsInit/_settingsRequests/settings_get")
+                logger.error("main | Unauthorized host attempted to access settings_get.")
+                return JSONResponse({"error":"Not allowed"}, status_code=405)
+
+            settingsList = [x[:-5] for x in os.listdir(ROAMING+"\\.RePCC\\settings")]
+
+            if arg == "all":
+                logger.info(f"main | settings_get all request recieded by {request.client.host}") 
+                return JSONResponse(settingsList, status_code=200)
+            
+            elif arg in settingsList:
+
+                return getSetting(arg)
+            
+            return JSONResponse({"error":"Setting not found."})
+
+        @App.post("/settings/post/{arg}")
+        async def settings_post(request:Request, arg:str):
+            if not findRegisteredHost(request.client.host): # type: ignore
+                logger.error("main | ERROR @ main.py/requestsInit/_settingsRequests/settings_post")
+                logger.error("main | Unauthorized host attempted to access settings_post.")
+                return JSONResponse({"error":"Not allowed"}, status_code=405)
+
+            settingsList = [x[:-5] for x in os.listdir(ROAMING+"\\.RePCC\\settings")]
+
+            if not arg[-5:] == ".yaml":
+                arg = f"{arg}.yaml"
+
+            PATH = ROAMING+"\\.RePCC\\settings\\"+arg
+
+            if os.path.exists(PATH) and arg[:-5] in settingsList:
+                try:
+                    jsonData = await request.json()
+
+                    # NOTE: FINISH SETTINGS OPEN AND SAVE
+                    
+                except json.decoder.JSONDecodeError as e:
+                    print("no JSON")
+                except Exception as e:
+                    print(e.__class__)
+                    print(e)
+
+            raise ValueError("SettingFile does not exist.")
+
+        logger.info("main | settings requests init finished.")
     _macroRequests()
+    _settingsRequests()
     logger.info("main | Requests init finished.")
 
 #   --------------- mDNS AUTO PAIRING
@@ -249,8 +298,8 @@ async def repccConnect(request:Request):
     logger.info(f"main | Recieving new request to connect by {request.client.host}") # type: ignore[attr-defined]
 
     data = await request.json()
-    macsYAML = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml"))
-    argsYAML = macsYAML["ARGS"]
+    macsYAML = getRegistryYaml()
+    argsYAML = getDebugSettings()
 
     def pair(mac:str, ip:str, macsYAML:dict):
         print("Pair")
@@ -265,7 +314,7 @@ async def repccConnect(request:Request):
                 macsYAML["IP"][mac] = ip
         else: 
             macsYAML["IP"] = {str(mac) : str(ip)}
-        yaml.safe_dump(macsYAML, open(ROAMING+"\\.RePCC\\settings\\register.yaml", "w"))
+        yaml.safe_dump(macsYAML, open(ROAMING+"\\.RePCC\\data\\register.yaml", "w"))
         return
 
     try:
@@ -382,12 +431,14 @@ def tray_main():
 
 def wipeSavedIPs():
 
+    # NOTE: FIX ERROR WHEN STARTING / FILE MISSING.
+
     logger.info("main | removing saved IPs from previous session...")
 
-    register = yaml.safe_load(open(ROAMING+"\\.RePCC\\settings\\register.yaml", "r"))
+    register = getRegistryYaml()
     register["IP"] = None
 
-    yaml.safe_dump(register, open(ROAMING+"\\.RePCC\\settings\\register.yaml", "w"))
+    yaml.safe_dump(register, open(ROAMING+"\\.RePCC\\data\\register.yaml", "w"))
     logger.info(f"main | IPs wiped. Registry data: {register}")
 
 #   --------------- MAIN 
@@ -398,6 +449,7 @@ def wipeSavedIPs():
 # - Start settings requests
 # - Fix trail from laserpointer not disappearing when let go
 # - Add variable trail length in settings
+# - NOTE: FINISH SETTINGS OPEN AND SAVE; LINE 270
 
 if __name__ == "__main__":
 

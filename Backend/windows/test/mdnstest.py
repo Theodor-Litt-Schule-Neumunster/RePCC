@@ -10,16 +10,6 @@ class TestListener(ServiceListener):
     def __init__(self) -> None:
         super().__init__()
 
-        PATH = r"C:\Users\mark\AppData\Roaming\.RePCC\macros\macro.pcmac"
-        self.DATA = None
-
-        with open(PATH, "r") as f:
-            
-            self.DATA = json.load(f)
-            f.close()
-
-        print(self.DATA)
-
     def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         print(f"Service {name} updated")
         self._handle_Service(zc, type_, name)
@@ -43,12 +33,10 @@ class TestListener(ServiceListener):
 
             ip = info.parsed_addresses()[0]
             props = info.properties
-            print(props)
             twofa = props[b"2fa"].decode('utf-8') # type: ignore
 
             addr = f"http://{ip}:15248/connect"
-            save = f"http://{ip}:15248/macro/save"
-            print(props)
+            sett = f"http://{ip}:15248/settings/post/test"
 
             r = requests.post(url=addr, json={
                 "mac":devicemac,
@@ -57,10 +45,10 @@ class TestListener(ServiceListener):
 
             if r.status_code == 202 or r.status_code == 200:
                 print("OK!")
+                r = requests.post(sett, json={
+                    "testSetting1":True
+                })
 
-                time.sleep(3)
-                print("Send")
-                r = requests.post(url=save, json={"name":"macro", "macro":self.DATA})
                 print(r.status_code)
             else:
                 print(f"Response is not 202. Code: {r.status_code}")

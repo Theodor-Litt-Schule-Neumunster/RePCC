@@ -1,7 +1,7 @@
 #filever : 0.2 indev
 
-#pyinstaller cmdlet: pyinstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repccBin.ico" pcmac.py
-# py -3 -m PyInstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repccBin.ico" pcmac.py
+# pyinstaller cmdlet: pyinstaller --onefile --add-data "assets;assets" --icon="./assets/repccBin.ico" pcmac.py
+# py -3 -m PyInstaller --onefile --add-data "assets;assets" --icon="./assets/repccBin.ico" pcmac.py
 
 import os
 import json
@@ -29,7 +29,7 @@ APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # 
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
 
-FILEVER = "0.19"
+FILEVER = "0.195"
 SPECIAL_KEY_MAP = {
     'ctrl': Key.ctrl,
     'shift': Key.shift,
@@ -301,6 +301,7 @@ Sleep is outside of range.
         return False
 
     def presenter(self, presenterKey:str):
+        print("presenter Call")
 
         def press(key):
 
@@ -310,6 +311,7 @@ Sleep is outside of range.
             keyboard.release(key)
 
         key = SPECIAL_KEY_MAP.get(presenterKey, None)
+        print(key)
 
         if not key == None:
             press(key)
@@ -552,7 +554,8 @@ def initializePCMAC():
             "macros",
             "settings",
             "assets",
-            "logs"
+            "logs",
+            "data"
         ],
     }
     def fileVerification():
@@ -572,6 +575,9 @@ def initializePCMAC():
                             shutil.copyfile(assetsPath("assets/repcclogo.ico"), MACDATA+"\\assets\\repcc.ico")
                             shutil.copyfile(assetsPath("assets/scriptlogo.ico"), MACDATA+"\\assets\\script.ico")
                             logger.info(f"pcmac | verif: Assets cloned into assets")
+                        if subkey == "data": 
+                            filedir = assetsPath("assets/_data/register.yaml")
+                            shutil.copyfile(filedir, MACDATA+"\\data\\register.yaml")
 
                     if os.path.exists(MACDATA+"\\settings\\"):
                         defaultsettingdir = assetsPath("assets/_settings/")
@@ -658,8 +664,4 @@ def initializePCMAC():
     regVerification()
 
 if __name__ == "__main__":
-    #initializePCMAC()
-    mac=macro()
-
-    #mac.verifyStructure("./base/structure.json")
-    mac.runMacro("testMouseMove.pcmac")
+    initializePCMAC()
