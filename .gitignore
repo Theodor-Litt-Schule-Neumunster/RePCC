@@ -1,9 +1,77 @@
-__pycache__
-.vscode
-Backend/windows/build
-Backend/windows/dist
-Backend/windows/*.spec
-build/*
+# --- General & OS ---
+.DS_Store
+.DS_Store?
+._*
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.log
+temp.txt
+
+# --- IDEs & Editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iml
+
+# Visual Studio (Windows)
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# --- Build Output (Root) ---
+# Compilers and CMake often generate these in the root
+build/
+dist/
+out/
+install/
+bin/
+obj/
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+*.ninja
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# --- Python Backend ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.manifest
+*.spec
+
+# C extensions
+*.so
+*.pyd
+*.dll
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env
+
+# Specific backend generated folders
+Backend/windows/build/
+Backend/windows/dist/
+
+# --- Flutter / Dart ---
+# Main build artifacts
+.dart_tool/
+.pub-cache/
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android/Gradle specific
+local.properties
+.gradle/
+
+# Generated Flutter Plugin Registrants (often rebuilt on compile)
 App/repcc_android/macos/Flutter/GeneratedPluginRegistrant.swift
 App/repcc_android/windows/flutter/generated_plugin_registrant.cc
 App/repcc_android/windows/flutter/generated_plugin_registrant.h
