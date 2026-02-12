@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/device.dart';
 import 'package:multicast_dns/multicast_dns.dart';
-import 'dart:io';
 import 'dart:async';
 
 class ConnectScreen extends StatefulWidget {
