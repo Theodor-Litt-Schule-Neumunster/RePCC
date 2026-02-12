@@ -2,7 +2,6 @@
 
 import os
 import sys
-import time
 import yaml
 import random
 import logging
@@ -128,7 +127,7 @@ def getRegistryYaml() -> dict:
     """
     Fetches the entries for REGISTRY yaml in user roaming.
     """
-    yamlfile = ROAMING+"\\.RePCC\\settings\\register.yaml"
+    yamlfile = ROAMING+"\\.RePCC\\data\\register.yaml"
 
     load = yaml.safe_load(open(yamlfile))
     return load
@@ -144,21 +143,48 @@ def getPresentationSettings() -> dict:
     return load
 
 def findRegisteredHost(ip:str) -> bool:
-    registerYAML = getRegistryYaml()
-    debugYAML = getDebugSettings()
+    try:
+        registerYAML = getRegistryYaml()
+        debugYAML = getDebugSettings()
 
-    _debug_allowExternal = debugYAML.get("allowExternalRequests", False)
+        _debug_allowExternal = debugYAML.get("allowExternalRequests", False)
 
-    if registerYAML["IP"] == None and _debug_allowExternal == False:
+        if _debug_allowExternal == True:
+            return True
+
+        if registerYAML["IP"] == None:
+            return False
+                        
+        found = False
+        for key in registerYAML["IP"]:
+            if registerYAML["IP"][key] == ip or _debug_allowExternal == True: 
+                found = True
+                break
+
+        if found:
+            return True
+        
         return False
-                    
-    found = False
-    for key in registerYAML["IP"]:
-        if registerYAML["IP"][key] == ip or _debug_allowExternal == True: 
-            found = True
-            break
-
-    if found:
-        return True
+    except Exception as e:
+        print(e)
+        return False
     
-    return False
+def getWebRtcSettings():
+    """
+    Fetches the settings for WEBRTC yaml in user roaming.
+    """
+
+    yamlfile = ROAMING+"\\.RePCC\\settings\\webrtc.yaml"
+
+    load = yaml.safe_load(open(yamlfile))
+    return load
+
+def getSetting(setting:str):
+    if setting == "debug":
+        return getDebugSettings()
+    if setting == "presentationTools":
+        return getPresentationSettings()
+    if setting == "webrtc":
+        return getWebRtcSettings()
+    
+    raise ValueError("Setting does not exist.")

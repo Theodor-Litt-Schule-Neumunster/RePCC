@@ -8,6 +8,7 @@ laserpointer:
   - 255   # A
   refreshrate: 30
   traillength: 20
+  size: 10
 buttons:
   forward: right
   backward: left

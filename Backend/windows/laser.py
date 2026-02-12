@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
 from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, pyqtSignal
 
-from args import LOGGER_CONF, customerror, forceLogFolder
+from args import LOGGER_CONF, customerror, forceLogFolder, getPresentationSettings
 
 # this is so cool
 
@@ -51,7 +51,7 @@ class LaserOverlay(QWidget):
 
         # Frameless screen that always stays on top w. transparent bg
 
-        loaded_settings = yaml.safe_load(open(SETTINGS+"presentationTools.yaml"))
+        loaded_settings = getPresentationSettings()
         self.loaded_settings = loaded_settings
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool) # type: ignore[attr-defined]

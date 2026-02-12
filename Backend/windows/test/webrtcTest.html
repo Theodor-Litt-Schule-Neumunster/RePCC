@@ -56,7 +56,7 @@
 </head>
 <body>
     <h1>RePCC Screen Share</h1>
-    <input type="text" id="serverUrl" value="http://192.168.178.15:15249" placeholder="Server URL">
+    <input type="text" id="serverUrl" value="http://172.20.10.6:15249" placeholder="Server URL">
     <button onclick="connect()">Connect</button>
     <div id="controls" style="margin-top: 15px;">
         <button onclick="presenterBack()" style="margin-right: 10px;">Back</button>
@@ -75,7 +75,6 @@
 
         function getMainServerUrl() {
             const serverUrl = document.getElementById('serverUrl').value;
-            // Replace WebRTC port (15249) with main server port (15248)
             return serverUrl.replace(':15249', ':15248');
         }
 
