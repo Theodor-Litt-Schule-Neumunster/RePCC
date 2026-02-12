@@ -1,11 +1,11 @@
 laserpointer:
-  style: simple
+  style: default
   fadetime: 100
   corecolor:
   - 255   # R
   - 0     # G
   - 0     # B
-  - 0     # A
+  - 255   # A
   refreshrate: 30
   traillength: 20
 buttons:

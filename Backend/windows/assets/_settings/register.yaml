@@ -2,6 +2,6 @@ MAC: Null
 IP: Null
 ARGS:
   allowMacroExecution: true
-  allowConnection: true
+  allowConnection: false
   maxSavedMacs: 10
   maxSavedIPs: 10
