@@ -13,8 +13,6 @@ final ColorScheme repccMain = ColorScheme (
   onTertiary: Colors.white,
   error: Color(0xFFc07a7a),
   onError: Colors.black87,
-  // background: Color(0xFF353535), // Background is a deprecated property in favor of surface; still set it for compatibility?
-  // onBackground: Colors.white,
   surface: Color(0xFF353535),
   onSurface: Colors.white,
 );
