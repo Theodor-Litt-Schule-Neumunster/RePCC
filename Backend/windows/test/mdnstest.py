@@ -36,7 +36,6 @@ class TestListener(ServiceListener):
             twofa = props[b"2fa"].decode('utf-8') # type: ignore
 
             addr = f"http://{ip}:15248/connect"
-            sett = f"http://{ip}:15248/settings/post/test"
 
             r = requests.post(url=addr, json={
                 "mac":devicemac,
@@ -45,11 +44,6 @@ class TestListener(ServiceListener):
 
             if r.status_code == 202 or r.status_code == 200:
                 print("OK!")
-                r = requests.post(sett, json={
-                    "testSetting1":True
-                })
-
-                print(r.status_code)
             else:
                 print(f"Response is not 202. Code: {r.status_code}")
 

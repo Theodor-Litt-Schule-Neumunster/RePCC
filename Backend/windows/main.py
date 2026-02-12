@@ -272,10 +272,13 @@ def requestsInit():
                 try:
                     jsonData = await request.json()
 
-                    # NOTE: FINISH SETTINGS OPEN AND SAVE
-                    
+                    with open(PATH, "w") as f:
+                        json.dump(jsonData, f)
+                        f.close()
+
+                    return JSONResponse({}, status_code=200)             
                 except json.decoder.JSONDecodeError as e:
-                    print("no JSON")
+                    return JSONResponse({"error":"No JSON has been parsed"}, status_code=405)
                 except Exception as e:
                     print(e.__class__)
                     print(e)
