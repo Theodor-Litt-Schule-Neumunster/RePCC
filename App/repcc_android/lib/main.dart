@@ -6,7 +6,7 @@ import 'package:repcc_android/screens/home.dart';
 final ColorScheme repccMain = ColorScheme (
   brightness: Brightness.dark,
   primary: Color(0xFFd9d9d9), 
-  onPrimary: Colors.white,
+  onPrimary: Colors.black,
   secondary: Color(0xFF9a9a9a), 
   onSecondary: Colors.white,
   tertiary: Color(0xFF404040),  
