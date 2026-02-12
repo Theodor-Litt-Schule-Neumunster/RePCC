@@ -5,16 +5,16 @@ import 'package:repcc_android/screens/home.dart';
 
 final ColorScheme repccMain = ColorScheme (
   brightness: Brightness.dark,
-  primary: Color(0xFF353535), 
+  primary: Color(0xFFd9d9d9), 
   onPrimary: Colors.white,
-  secondary: Color(0xFF202020), 
+  secondary: Color(0xFF9a9a9a), 
   onSecondary: Colors.white,
   tertiary: Color(0xFF404040),  
   onTertiary: Colors.white,
   error: Color(0xFFc07a7a),
   onError: Colors.black87,
-  background: Color(0xFF353535), // Background is a deprecated property in favor of surface, but we can still set it for compatibility
-  onBackground: Colors.white,
+  // background: Color(0xFF353535), // Background is a deprecated property in favor of surface; still set it for compatibility?
+  // onBackground: Colors.white,
   surface: Color(0xFF353535),
   onSurface: Colors.white,
 );
@@ -30,9 +30,21 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
+        useMaterial3: true,
         colorScheme: repccMain,
         fontFamily: 'JetBrainsMono',
-        useMaterial3: true,
+        scaffoldBackgroundColor: repccMain.surface,
+        appBarTheme: AppBarTheme(
+          backgroundColor: repccMain.tertiary,
+          foregroundColor: repccMain.onTertiary,
+        ),
+        cardTheme: CardThemeData(
+          color: repccMain.tertiary,
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: repccMain.primary,
+          foregroundColor: repccMain.onPrimary,
+        ),
       ),
       debugShowCheckedModeBanner: false, // Disables the debug banner
       home: const HomeScreen(),

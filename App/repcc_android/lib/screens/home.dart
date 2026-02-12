@@ -18,14 +18,32 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     const String appTitle = 'RePCC';
     return Scaffold(
-      backgroundColor: Color(0xFF353535),
       appBar: AppBar(
-        backgroundColor: Color(0xFF121212),
         title: Center(child: Text(appTitle, style: TextStyle(color: Colors.white, fontSize: 35),)),
+        actions: <Widget>[
+          IconButton(
+            icon: SvgPicture.asset('assets/Icons/info.svg',
+                colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                width: 24,
+                height: 24),
+            onPressed: () {
+              showAboutDialog(
+                context: context,
+                applicationName: appTitle,
+                applicationVersion: 'v0.1.0',
+                applicationIcon: SvgPicture.asset('assets/repcclogo.svg', width: 48, height: 48),
+                children: [
+                  Text('RePCC is a tool for managing and controlling your devices remotely.'),
+                  SizedBox(height: 10),
+                  Text('Developed by Nerds'),
+                ],
+              );
+            },
+          ),
+        ],
       ),
       body: Center(
         child: Container(
-          color: Color(0xFF353535),
           padding: EdgeInsets.all(10),
           child: Column(
             children: [

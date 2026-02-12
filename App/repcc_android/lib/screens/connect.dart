@@ -133,7 +133,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF151515),
       body: Container(
         width: double.infinity,
         height: double.infinity,
