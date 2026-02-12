@@ -301,7 +301,6 @@ Sleep is outside of range.
         return False
 
     def presenter(self, presenterKey:str):
-        print("presenter Call")
 
         def press(key):
 
@@ -311,7 +310,6 @@ Sleep is outside of range.
             keyboard.release(key)
 
         key = SPECIAL_KEY_MAP.get(presenterKey, None)
-        print(key)
 
         if not key == None:
             press(key)
@@ -523,7 +521,7 @@ Sleep is outside of range.
                 elif param_amtLoops > 1 and not param_amtLoops == None: # type: ignore[attr-defined]
                     self.startKeyListener()
                     for _ in range(int(param_amtLoops)): # type: ignore[attr-defined]
-
+                        
                         if self.kill: 
                             if self.listener:
                                 self.listener.stop()
@@ -532,9 +530,10 @@ Sleep is outside of range.
                             break
 
                         run()
-                        return
             except Exception:
                 if not Exception.__class__ == KeyboardInterrupt:
+
+                    print("error, so single")
 
                     self.startKeyListener()
                     run()
@@ -545,7 +544,6 @@ Sleep is outside of range.
         except Exception as e:
             logger.error("pcmac | ERROR @ pcmac.py/macro/runMacro")
             logger.error(customerror("pcmac", e))
-
 
 def initializePCMAC():
 
