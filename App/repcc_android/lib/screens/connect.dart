@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../models/device.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 import 'dart:async';
+import 'dart:io';
 
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});
@@ -13,6 +14,7 @@ class ConnectScreen extends StatefulWidget {
 
 class _ConnectScreenState extends State<ConnectScreen> {
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _ipController = TextEditingController();
   List<Device> _discoveredDevices = [];
   bool _isScanning = false;
   String _statusMessage = 'Press scan to discover devices';
@@ -20,7 +22,69 @@ class _ConnectScreenState extends State<ConnectScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _ipController.dispose();
     super.dispose();
+  }
+
+  Future<List<InternetAddress>> _getActiveNetworkAddresses() async {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLinkLocal: false,
+      includeLoopback: false,
+    );
+
+    final addresses = <InternetAddress>[];
+    for (final interface in interfaces) {
+      for (final address in interface.addresses) {
+        if (_isUsableNetworkIp(address.address)) {
+          addresses.add(address);
+        }
+      }
+    }
+    return addresses;
+  }
+
+  bool _isUsableNetworkIp(String ip) {
+    if (ip == '0.0.0.0') return false;
+    return !_isLoopbackOrLinkLocal(ip);
+  }
+
+  bool _isLoopbackOrLinkLocal(String ip) {
+    final parts = ip.split('.');
+    if (parts.length != 4) return true;
+    final first = int.tryParse(parts[0]);
+    final second = int.tryParse(parts[1]);
+    if (first == null || second == null) return true;
+    if (first == 127) return true;
+    if (first == 169 && second == 254) return true;
+    return false;
+  }
+
+  bool _isSameSubnet24(String firstIp, String secondIp) {
+    final firstParts = firstIp.split('.');
+    final secondParts = secondIp.split('.');
+    if (firstParts.length != 4 || secondParts.length != 4) return false;
+    return firstParts[0] == secondParts[0] &&
+        firstParts[1] == secondParts[1] &&
+        firstParts[2] == secondParts[2];
+  }
+
+  bool _belongsToActiveNetwork(String discoveredIp, List<InternetAddress> localAddresses) {
+    if (!_isUsableNetworkIp(discoveredIp)) return false;
+    if (localAddresses.isEmpty) return true;
+    return localAddresses.any((local) => _isSameSubnet24(discoveredIp, local.address));
+  }
+
+  String _scanErrorMessage(Object error) {
+    if (error is SocketException) {
+      final errorCode = error.osError?.errorCode;
+      if (Platform.isWindows && errorCode == 10042) {
+        return 'mDNS konnte unter Windows nicht gestartet werden (Socket Option nicht unterstützt). '
+            'Das liegt nicht daran, dass kein Server läuft. Bitte VPN/Firewall prüfen und erneut versuchen.';
+      }
+      return 'Network error while scanning: ${error.message}';
+    }
+    return 'Error scanning: $error';
   }
 
   Future<void> _scanForDevices() async {
@@ -33,6 +97,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     try {
       final String serviceType = '_repcc._tcp';
       final MDnsClient client = MDnsClient();
+      final localNetworkAddresses = await _getActiveNetworkAddresses();
       
       await client.start();
 
@@ -70,7 +135,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             break;
           }
 
-          if (ipAddress != null) {
+          if (ipAddress != null && _belongsToActiveNetwork(ipAddress, localNetworkAddresses)) {
             final device = Device(
               id: ipAddress,
               name: srv.target,
@@ -95,15 +160,17 @@ class _ConnectScreenState extends State<ConnectScreen> {
       if (!mounted) return;
       setState(() {
         _isScanning = false;
-        _statusMessage = _discoveredDevices.isEmpty 
-            ? 'No devices found. Make sure the server is running.' 
+        _statusMessage = _discoveredDevices.isEmpty
+          ? (localNetworkAddresses.isEmpty
+            ? 'No active network found. Please connect to Wi-Fi/LAN.'
+            : 'No devices found in your current network.')
             : 'Found ${_discoveredDevices.length} device(s)';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isScanning = false;
-        _statusMessage = 'Error scanning: $e';
+        _statusMessage = _scanErrorMessage(e);
       });
     }
   }
@@ -114,19 +181,26 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   void _addDevice() {
     final String name = _nameController.text.trim();
-    if (name.isNotEmpty) {
+    final String ipAddress = _ipController.text.trim();
+
+    if (name.isNotEmpty && ipAddress.isNotEmpty) {
       // Create a new Device object manually (for testing/manual entry)
       final newDevice = Device(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: ipAddress,
         name: name,
-        ipAddress: '192.168.1.100',
-        macAddress: '00:00:00:00:00:00',
+        ipAddress: ipAddress,
+        macAddress: 'Unknown',
         ports: [8080],
         isConnected: true,
       );
 
       Navigator.pop(context, newDevice);
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Bitte Name und IP-Adresse eingeben.')),
+    );
   }
 
   @override
@@ -230,6 +304,21 @@ class _ConnectScreenState extends State<ConnectScreen> {
                         style: const TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono'),
                         decoration: InputDecoration(
                           hintText: 'Enter Device Name',
+                          hintStyle: TextStyle(color: Colors.white54, fontFamily: 'JetBrainsMono'),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white30),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _ipController,
+                        style: const TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono'),
+                        decoration: InputDecoration(
+                          hintText: 'Enter IP Address',
                           hintStyle: TextStyle(color: Colors.white54, fontFamily: 'JetBrainsMono'),
                           enabledBorder: OutlineInputBorder(
                             borderSide: BorderSide(color: Colors.white30),

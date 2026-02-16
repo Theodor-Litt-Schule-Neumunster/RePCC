@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   // List of devices managed by the state - now starts empty
   List<Device> devices = [];
+  bool isGridStyle = false;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +22,18 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Center(child: Text(appTitle, style: TextStyle(color: Colors.white, fontSize: 35),)),
         actions: <Widget>[
+          IconButton(
+            icon: Icon(
+              isGridStyle ? Icons.view_agenda : Icons.grid_view,
+              color: Colors.white,
+            ),
+            tooltip: isGridStyle ? 'Einfache Liste' : 'Kachelansicht',
+            onPressed: () {
+              setState(() {
+                isGridStyle = !isGridStyle;
+              });
+            },
+          ),
           IconButton(
             icon: SvgPicture.asset('assets/Icons/info.svg',
                 colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
@@ -52,16 +65,33 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.white, fontSize: 24, fontFamily: 'JetBrainsMono'),
               ),
               Expanded(
-                child: ListView.builder(
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) {
-                    return _buildDeviceCard(devices[index], () {
-                      setState(() {
-                        devices.removeAt(index);
-                      });
-                    });
-                  },
-                ),
+                child: isGridStyle
+                    ? GridView.builder(
+                        itemCount: devices.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: 1,
+                        ),
+                        itemBuilder: (context, index) {
+                          return _buildDeviceGridCard(devices[index], () {
+                            setState(() {
+                              devices.removeAt(index);
+                            });
+                          });
+                        },
+                      )
+                    : ListView.builder(
+                        itemCount: devices.length,
+                        itemBuilder: (context, index) {
+                          return _buildDeviceCard(devices[index], () {
+                            setState(() {
+                              devices.removeAt(index);
+                            });
+                          });
+                        },
+                      ),
               ),
             ],
           ),
@@ -143,6 +173,77 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 24,
             height: 24,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceGridCard(Device device, VoidCallback onDelete) {
+    return Card(
+      color: device.isConnected ? Color(0xFF404040) : Color(0xFF202020),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/Icons/computer.svg',
+                  colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                  width: 20,
+                  height: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    device.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono'),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: SvgPicture.asset(
+                    'assets/Icons/delete.svg',
+                    colorFilter: ColorFilter.mode(Colors.white70, BlendMode.srcIn),
+                    width: 18,
+                    height: 18,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              device.isConnected ? 'Connected' : 'Disconnected',
+              style: TextStyle(
+                color: device.isConnected ? Colors.green : Colors.white70,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'IP: ${device.ipAddress}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            ),
+            Text(
+              'MAC: ${device.macAddress}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            ),
+            Text(
+              'Ports: ${device.ports.join(", ")}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white60, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            ),
+          ],
         ),
       ),
     );
