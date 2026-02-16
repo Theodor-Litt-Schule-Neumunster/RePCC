@@ -184,14 +184,9 @@ def _requestsMain():
         :return None:
         """
 
-        time.sleep(5)
-        print("call")
+        time.sleep(10)
+
         try:
-
-            # datetime.datetime.now().timestamp()
-            # -> 1771168987.380141
-            #    In seconds
-
             while True:
                 time.sleep(1)
 
@@ -203,47 +198,45 @@ def _requestsMain():
                         f.close()
                 finally:
 
-                    changes = False
-
                     if type(data) == list:
 
                         def rec_check(data:list):
                             for i in range(len(data)):
                                 
                                 lastupdate = data[i].get("lastupdate", 0)
+                                name = data[i].get("name", "Unknown")
                                 if datetime.datetime.now().timestamp() - lastupdate >= timeoutSeconds:
+                                    if not WINDOW == None:
+                                        WINDOW.addActivity(f"{name} has been inactive for {timeoutSeconds} seconds. Client has been removed.")
                                     del data[i]
                                     return rec_check(data)
-                                    
+                                
+                            return data
                             
-                        return ...
+                        data = rec_check(data)
+                        if data == None:
+                            data = []
 
-                        # -- del
-                        for i in range(len(data)):
-                            lastupdate = data[i].get("lastupdate", 0)
-                            name = data[i].get("name", "Unknown")
-
-                            if datetime.datetime.now().timestamp() - lastupdate >= timeoutSeconds:
-                                del data[i]
-                                changes = True
-                                if not WINDOW == None:
-                                    WINDOW.addActivity(f"{name} has been inactive for {timeoutSeconds} seconds. Client has been removed.")
-
-                    if changes:
                         with open(assetsPath("assets/connections.json"), "w") as f:
                             json.dump(data, f, indent=5)
                             f.close()
-                            if not WINDOW == None:
-                                WINDOW.addActivity(f"connections.json updated after entry removed.")
+
         finally:
-            print("TRUE loop block killed.")
+            if not WINDOW == None:
+                WINDOW.addActivity(f"Warning! Timeouthandler has been killed. Restarting in 10.")
+            timeoutHandler()
             pass
 
     def requestInit():
 
         @REQ_APP.get("/ping")
         async def fapi_ping(request:Request):
-            ... 
+
+            try:
+                with open(assetsPath("assets/connections.json"), "r") as f:
+                    ...
+            finally:
+                ... 
 
         @REQ_APP.get("/connect")
         async def fapi_connect(request:Request):
