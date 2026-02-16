@@ -5,6 +5,8 @@ import socket
 import qrcode
 import signal
 import pystray
+import requests
+import ipaddress
 import threading
 
 from io import BytesIO
@@ -14,6 +16,8 @@ from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
 
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
+
+CLIENTWINDOW = None
 
 def assetsPath(relativepath:str):
     """
@@ -122,10 +126,27 @@ def _mdnsMain():
             if info and "repccpresentationserver" in name.lower():
                 
                 print("Presentaion Server found.")
+                ip = str(ipaddress.ip_address(info.addresses[0]))
+
+                r = requests.post(f"http://{ip}:15248/connect/{socket.gethostname()}")
+
+                if r.status_code == 200:
+
+                    if not CLIENTWINDOW == None:
+                        CLIENTWINDOW.setConnection(True)
+
+                    zeroconf.close()
+                    print("ZC CLOSED!")
+                
+                    return
+                print("not 200")
 
     zeroconf = Zeroconf()
     listener = mdnsListener()
     browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
+
+# TODO:
+# - check if connection stays, if not: reopen ZC 
 
 if __name__ == "__main__":
 
@@ -154,8 +175,8 @@ if __name__ == "__main__":
         "name":socket.gethostname()
     }
 
-    window = ClientWindow(str(data))
+    CLIENTWINDOW  = ClientWindow(str(data))
 
-    threading.Thread(target=_trayMain, args=(window, app), daemon=True).start()
+    threading.Thread(target=_trayMain, args=(CLIENTWINDOW, app), daemon=True).start()
     threading.Thread(target=_mdnsMain, daemon=True).start()
     sys.exit(app.exec_())

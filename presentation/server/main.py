@@ -134,6 +134,10 @@ class MainWindow(QMainWindow):
 
             self.addActivity("Toggle visibility toggled visible.")
 
+def addActivity(message:str):
+    if not WINDOW == None:
+        WINDOW.addActivity(message)
+
 def startMainWindow():
 
     global WINDOW, APP
@@ -172,6 +176,22 @@ def _mdnsMain(port:int):
     return zc, serviceinfo
 
 def _requestsMain():
+
+    def findHost(data:list, host:str):
+
+        found = False
+        key_i = None
+
+        for i in range(len(data)):
+            subdata = data[i]
+            hostdata = subdata.get("host", None)
+
+            if host == hostdata:
+                found = True
+                key_i = i
+                break
+
+        return found, key_i
 
     def timeoutHandler(timeoutSeconds:int):
         """
@@ -233,14 +253,62 @@ def _requestsMain():
         async def fapi_ping(request:Request):
 
             try:
+                data = None
                 with open(assetsPath("assets/connections.json"), "r") as f:
-                    ...
-            finally:
-                ... 
+                    data = json.load(f)
+                    f.close()
 
-        @REQ_APP.get("/connect")
-        async def fapi_connect(request:Request):
-            ...
+                if not type(data) == list:
+                    data = []
+
+                found, i = findHost(data, request.client.host) # type: ignore
+                if found:
+                    data[i]["lastupdate"] = datetime.datetime.now().timestamp()
+
+                    with open(assetsPath("assets/connections.json"), "w") as f:
+                        json.dump(data, f)
+                        f.close()
+                    return JSONResponse({}, status_code=200)
+                
+                return JSONResponse({}, status_code=403)
+                    
+            finally:
+                
+                return JSONResponse({"error":"Ping failed."}, status_code=500)
+
+        @REQ_APP.post("/connect/{name}")
+        async def fapi_connect(request:Request, name:str):
+            try:
+                data = None
+                with open(assetsPath("assets/connections.json"), "r") as f:
+                    data = json.load(f)
+                    f.close()
+
+                if not type(data) == list:
+                    data = []
+
+                found, _ = findHost(data, request.client.host) # type: ignore
+
+                if not found:
+                    newDict = {
+                        "name":name,
+                        "host":request.client.host, # type: ignore,
+                        "lastupdate":datetime.datetime.now().timestamp()
+                    }
+
+                    data.append(newDict)
+
+                    with open(assetsPath("assets/connections.json"), "w") as f:
+                        json.dump(data, f, indent=5)
+                        f.close()
+
+                    addActivity(f"Added new device: {name}")
+
+                    return JSONResponse({}, status_code=200)
+                return JSONResponse({}, status_code=405)
+            except Exception as e:
+                print(e)
+                return JSONResponse({"error":"Connect failed."}, status_code=500)
 
     requestInit()
 

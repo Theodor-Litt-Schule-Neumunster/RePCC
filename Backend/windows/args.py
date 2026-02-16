@@ -120,8 +120,12 @@ def getDebugSettings() -> dict:
 
     yamlfile = ROAMING+"\\.RePCC\\settings\\debug.yaml"
 
-    load = yaml.safe_load(open(yamlfile))
-    return load
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
 
 def getRegistryYaml() -> dict:
     """
@@ -129,8 +133,12 @@ def getRegistryYaml() -> dict:
     """
     yamlfile = ROAMING+"\\.RePCC\\data\\register.yaml"
 
-    load = yaml.safe_load(open(yamlfile))
-    return load
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
 
 def getPresentationSettings() -> dict:
     """
@@ -139,13 +147,20 @@ def getPresentationSettings() -> dict:
 
     yamlfile = ROAMING+"\\.RePCC\\settings\\presentationTools.yaml"
 
-    load = yaml.safe_load(open(yamlfile))
-    return load
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
 
 def findRegisteredHost(ip:str) -> bool:
     try:
         registerYAML = getRegistryYaml()
         debugYAML = getDebugSettings()
+
+        if registerYAML == None or debugYAML == None:
+            return None
 
         _debug_allowExternal = debugYAML.get("allowExternalRequests", False)
 
@@ -176,8 +191,12 @@ def getWebRtcSettings():
 
     yamlfile = ROAMING+"\\.RePCC\\settings\\webrtc.yaml"
 
-    load = yaml.safe_load(open(yamlfile))
-    return load
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
 
 def getSetting(setting:str):
     if setting == "debug":
