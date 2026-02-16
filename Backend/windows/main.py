@@ -67,9 +67,6 @@ def requestsInit():
         logger.info(f"main | Recieved ping from {request.client.host}. Responding with OK") # type: ignore[attr-defined]
         return JSONResponse({"message":"Success"}, status_code=200)
 
-        # TODO: Add Argparser for manual saving reading opening
-        # TODO: Add HTTP requests for saving reading opening
-
     def _macroRequests():
 
         @App.get("/macro/getall")
@@ -245,7 +242,7 @@ def requestsInit():
             settingsList = [x[:-5] for x in os.listdir(ROAMING+"\\.RePCC\\settings")]
 
             if arg == "all":
-                logger.info(f"main | settings_get all request recieded by {request.client.host}") 
+                logger.info(f"main | settings_get all request recieded by {request.client.host}") # type: ignore
                 return JSONResponse(settingsList, status_code=200)
             
             elif arg in settingsList:
@@ -449,7 +446,6 @@ def wipeSavedIPs():
 # - Start settings requests
 # - Fix trail from laserpointer not disappearing when let go
 # - Add variable trail length in settings
-# - NOTE: FINISH SETTINGS OPEN AND SAVE; LINE 270
 
 if __name__ == "__main__":
 
