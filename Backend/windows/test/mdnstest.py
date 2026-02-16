@@ -10,6 +10,8 @@ class TestListener(ServiceListener):
     def __init__(self) -> None:
         super().__init__()
 
+        MDNS_ENABLED = True
+
     def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         print(f"Service {name} updated")
         self._handle_Service(zc, type_, name)
@@ -47,9 +49,6 @@ class TestListener(ServiceListener):
             else:
                 print(f"Response is not 202. Code: {r.status_code}")
 
-
-
-# Create a single Zeroconf instance to share
 zeroconf = Zeroconf()
 listener = TestListener()
 browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)

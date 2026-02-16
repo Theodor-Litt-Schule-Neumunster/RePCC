@@ -156,6 +156,9 @@ def assetsPath(relativepath:str):
     
     :param relativepath: Relative filepath for asset. e. g. /assets/repcclogo.ico
     """
+
+    # NOTE: Error when run inside a dosbox. "__file__" not found ?
+    
     basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(basepath, relativepath)
 
@@ -244,7 +247,7 @@ def _requestsMain():
         finally:
             if not WINDOW == None:
                 WINDOW.addActivity(f"Warning! Timeouthandler has been killed. Restarting in 10.")
-            timeoutHandler()
+            timeoutHandler(timeoutSeconds)
             pass
 
     def requestInit():
@@ -263,7 +266,7 @@ def _requestsMain():
 
                 found, i = findHost(data, request.client.host) # type: ignore
                 if found:
-                    data[i]["lastupdate"] = datetime.datetime.now().timestamp()
+                    data[i]["lastupdate"] = datetime.datetime.now().timestamp() # type: ignore
 
                     with open(assetsPath("assets/connections.json"), "w") as f:
                         json.dump(data, f)
@@ -272,7 +275,7 @@ def _requestsMain():
                 
                 return JSONResponse({}, status_code=403)
                     
-            finally:
+            except Exception as e:
                 
                 return JSONResponse({"error":"Ping failed."}, status_code=500)
 
@@ -292,7 +295,7 @@ def _requestsMain():
                 if not found:
                     newDict = {
                         "name":name,
-                        "host":request.client.host, # type: ignore,
+                        "host":request.client.host, # type: ignore
                         "lastupdate":datetime.datetime.now().timestamp()
                     }
 
@@ -307,13 +310,12 @@ def _requestsMain():
                     return JSONResponse({}, status_code=200)
                 return JSONResponse({}, status_code=405)
             except Exception as e:
-                print(e)
                 return JSONResponse({"error":"Connect failed."}, status_code=500)
 
     requestInit()
 
     threading.Thread(target=timeoutHandler, args=(10,)).start()
-    uvicorn.run(REQ_APP, host="0.0.0.0", port=15248)
+    uvicorn.run(REQ_APP, host="0.0.0.0", port=15247)
 
 def _trayMain():
 
@@ -321,7 +323,6 @@ def _trayMain():
     
     while APP == None and WINDOW == None:
         time.sleep(.01)
-
     try:
 
         zc, serviceinfo = None, None
@@ -331,6 +332,8 @@ def _trayMain():
             nonlocal zc, serviceinfo
 
             mdnsActivity.enabled = not mdnsActivity.enabled # type: ignore
+
+            addActivity(f"Toggled mDNS to {mdnsActivity.enabled}") # type: ignore
 
             if mdnsActivity.enabled == True: # type: ignore
                 zc, serviceinfo = _mdnsMain(15248)

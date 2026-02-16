@@ -18,6 +18,9 @@ from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 
 CLIENTWINDOW = None
+MDNS_ENABLED = False
+PING_SUCCESS = None
+SERVER_IP = None
 
 def assetsPath(relativepath:str):
     """
@@ -29,11 +32,11 @@ def assetsPath(relativepath:str):
     return os.path.join(basepath, relativepath)
 
 class ClientWindow(QWidget):
-
     toggle_signal = pyqtSignal()
 
     def __init__(self, data:str) -> None:
         super().__init__()
+        MDNS_ENABLED = True
         self.toggle_signal.connect(self.toggle_visibility)
 
         self.connected = False
@@ -106,9 +109,65 @@ def _trayMain(window: ClientWindow, app: QApplication):
         print(e)
 
 def _mdnsMain():
+
+    zeroconf, listener, browser = None, None, None
+
+    def createmDNS():
+
+        nonlocal zeroconf, listener, browser
+
+        zeroconf = Zeroconf()
+        listener = mdnsListener()
+        browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
+
+    def mdnsHandler():
+        global PING_SUCCESS, MDNS_ENABLED, SERVER_IP
+
+        while True:
+
+            time.sleep(5)
+
+            if PING_SUCCESS == None:
+                print("first time boot. starting...")
+                
+                threading.Thread(target=createmDNS).start() # pray
+                PING_SUCCESS = True
+                print("Started.")
+                continue # no checks for first loop
+
+            if PING_SUCCESS == True and SERVER_IP and MDNS_ENABLED == False:
+                print("Sending ping")
+
+                try:
+
+                    req = requests.get(f"http://{SERVER_IP}:15247/ping", timeout=.5)
+
+                    if req.status_code == 200:
+                        PING_SUCCESS = True
+                        continue
+
+                    PING_SUCCESS = False
+                    continue
+                except TimeoutError:
+                    PING_SUCCESS = False
+                    print("timeout error")
+                    continue
+
+            if PING_SUCCESS == False and SERVER_IP and MDNS_ENABLED == False:
+                print("Resetting...")
+
+                PING_SUCCESS = None
+                SERVER_IP = None
+                continue
+
     class mdnsListener(ServiceListener):
+
         def __init__(self) -> None:
             super().__init__()
+
+            global MDNS_ENABLED
+
+            MDNS_ENABLED = True
 
         def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
             pass
@@ -121,29 +180,34 @@ def _mdnsMain():
 
         def _handle_Service(self, zc: Zeroconf, type_:str, name:str):
 
+            global MDNS_ENABLED, SERVER_IP
+
             info = zc.get_service_info(type_, name)
 
             if info and "repccpresentationserver" in name.lower():
                 
                 print("Presentaion Server found.")
                 ip = str(ipaddress.ip_address(info.addresses[0]))
+                SERVER_IP = ip
 
-                r = requests.post(f"http://{ip}:15248/connect/{socket.gethostname()}")
+                while True:
+                    time.sleep(2)
 
-                if r.status_code == 200:
+                    r = requests.post(f"http://{ip}:15247/connect/{socket.gethostname()}")
 
-                    if not CLIENTWINDOW == None:
-                        CLIENTWINDOW.setConnection(True)
+                    if r.status_code == 200:
 
-                    zeroconf.close()
-                    print("ZC CLOSED!")
-                
-                    return
-                print("not 200")
+                        if not CLIENTWINDOW == None:
+                            CLIENTWINDOW.setConnection(True)
 
-    zeroconf = Zeroconf()
-    listener = mdnsListener()
-    browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
+                        # Kill zeroconf and reset vars
+                        zeroconf.close() # type: ignore
+                        MDNS_ENABLED = False
+                    
+                        return
+                    print("not 200")
+
+    mdnsHandler()
 
 # TODO:
 # - check if connection stays, if not: reopen ZC 
