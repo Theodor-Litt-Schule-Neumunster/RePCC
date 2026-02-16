@@ -237,6 +237,8 @@ def requestsInit():
         @App.get("/settings/get/{arg}")
         async def settings_get(request:Request, arg:str):
 
+            logger.info(f"main | settings get request recieded by {request.client.host}") #type: ignore
+
             if not findRegisteredHost(request.client.host): # type: ignore
                 logger.error("main | ERROR @ main.py/requestsInit/_settingsRequests/settings_get")
                 logger.error("main | Unauthorized host attempted to access settings_get.")
@@ -245,17 +247,21 @@ def requestsInit():
             settingsList = [x[:-5] for x in os.listdir(ROAMING+"\\.RePCC\\settings")]
 
             if arg == "all":
-                logger.info(f"main | settings_get all request recieded by {request.client.host}") 
+                logger.info(f"main | settings_get all request is ALL") 
                 return JSONResponse(settingsList, status_code=200)
             
             elif arg in settingsList:
 
+                logger.info(f"main | settings_get all request is individual setting file.") 
                 return getSetting(arg)
             
             return JSONResponse({"error":"Setting not found."})
 
         @App.post("/settings/post/{arg}")
         async def settings_post(request:Request, arg:str):
+
+            logger.info(f"main | settings_post request recieded by {request.client.host}") #type: ignore
+
             if not findRegisteredHost(request.client.host): # type: ignore
                 logger.error("main | ERROR @ main.py/requestsInit/_settingsRequests/settings_post")
                 logger.error("main | Unauthorized host attempted to access settings_post.")
@@ -275,6 +281,8 @@ def requestsInit():
                     with open(PATH, "w") as f:
                         json.dump(jsonData, f)
                         f.close()
+
+                    logger.info(f"main | Setting {arg} saved with new data: {str(jsonData)}") 
 
                     return JSONResponse({}, status_code=200)             
                 except json.decoder.JSONDecodeError as e:
@@ -452,7 +460,6 @@ def wipeSavedIPs():
 # - Start settings requests
 # - Fix trail from laserpointer not disappearing when let go
 # - Add variable trail length in settings
-# - NOTE: FINISH SETTINGS OPEN AND SAVE; LINE 270
 
 if __name__ == "__main__":
 

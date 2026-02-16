@@ -73,7 +73,14 @@ class LaserOverlay(QWidget):
         self.dot_x = screen.width() // 2
         self.dot_y = screen.height() // 2
 
-        self.trail = deque(maxlen=20) # TODO: LOAD FROM SETTINGS!!!
+        self.trail = deque(maxlen=loaded_settings["laserpointer"].get("traillength", 20))
+
+        self.trail_fade_interval_ms = 50
+        self.trail_fade_step = 0.06
+
+        self.trail_timer = QTimer(self)
+        self.trail_timer.timeout.connect(self._fade_trail_step)
+        self.trail_timer.start(self.trail_fade_interval_ms)
 
         cc = tuple(loaded_settings["laserpointer"].get("corecolor", [255, 0, 0, 0]))
         self.coreColor = QColor(int(cc[0]), int(cc[1]), int(cc[2]), int(cc[3]))
@@ -121,6 +128,17 @@ class LaserOverlay(QWidget):
             logger.error("Laser | ERROR @ laser.py/LaserOverlay/make_click_through")
             logger.error(customerror("Laser", e))
     
+    def _fade_trail_step(self) -> None:
+        if not self.trail:
+            return
+        new_trail = deque(maxlen=self.trail.maxlen)
+        for (tx, ty, alpha) in self.trail:
+            alpha = max(0.0, alpha - self.trail_fade_step)
+            if alpha > 0:
+                new_trail.append((tx, ty, alpha))
+        self.trail = new_trail
+        self.repaint()
+
     def paintEvent(self, a0:QPaintEvent) -> None: # type: ignore[attr-defined]
         """
         Draws the red dot.
@@ -174,13 +192,13 @@ class LaserOverlay(QWidget):
                 coreradius * 2, coreradius * 2)
         
         elif style == "trail":
-            for i, (tx, ty) in enumerate(reversed(list(self.trail))):
+            for i, (tx, ty, alpha) in enumerate(reversed(list(self.trail))):
                 if i == 0:
                     continue
 
-                trail_opacity = max(0, self.opacity * (1 - i / len(self.trail)))
+                trail_opacity = max(0, alpha * (1 - i / len(self.trail)))
                 trail_glowradius = max(0, glowradius * (1 - i / len(self.trail)) * 0.5)
-                
+
                 if trail_opacity <= 0 or trail_glowradius <= 0:
                     continue
 
@@ -237,7 +255,7 @@ class LaserOverlay(QWidget):
         self.dot_x = int(norm_x * screen.width())
         self.dot_y = int(norm_y * screen.height())
 
-        self.trail.append((self.dot_x, self.dot_y))
+        self.trail.append((self.dot_x, self.dot_y, 1.0))
 
         self.fadeout_reset()
         self.repaint()
