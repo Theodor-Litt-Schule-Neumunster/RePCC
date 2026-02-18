@@ -23,6 +23,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+file_lock = threading.Lock()
+
 REQ_APP = FastAPI(info=True)
 REQ_APP.add_middleware(
     CORSMiddleware,
@@ -32,7 +34,7 @@ REQ_APP.add_middleware(
     allow_headers=["*"],
 )
 
-WINDOW, APP = None, None
+WINDOW, APP = None, False
 
 class MainWindow(QMainWindow):
 
@@ -95,15 +97,16 @@ class MainWindow(QMainWindow):
     def addActivity(self, message:str):
         self.logList.insertItem(0, f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}")
 
-    def loadConnections(self):
+    def loadConnections(self): # NOTE: LOCK FILE integrated.
         self.listWidget.clear()
 
         try:
             data = None
-            with open(assetsPath("assets/connections.json"), "r") as f:
-                
-                data = json.load(f)
-                f.close()
+            with file_lock:
+                with open(assetsPath("assets/connections.json"), "r") as f:
+                    
+                    data = json.load(f)
+                    f.close()
 
             if not len(data) == 0:
                 for i in range(len(data)):
@@ -216,9 +219,10 @@ def _requestsMain():
                 data = None
                 
                 try:
-                    with open(assetsPath("assets/connections.json"), "r")  as f:
-                        data = json.load(f)
-                        f.close()
+                    with file_lock:
+                        with open(assetsPath("assets/connections.json"), "r")  as f:
+                            data = json.load(f)
+                            f.close()
                 finally:
 
                     if type(data) == list:
@@ -240,9 +244,10 @@ def _requestsMain():
                         if data == None:
                             data = []
 
-                        with open(assetsPath("assets/connections.json"), "w") as f:
-                            json.dump(data, f, indent=5)
-                            f.close()
+                        with file_lock:
+                            with open(assetsPath("assets/connections.json"), "w") as f:
+                                json.dump(data, f, indent=5)
+                                f.close()
 
         finally:
             if not WINDOW == None:
@@ -257,9 +262,10 @@ def _requestsMain():
 
             try:
                 data = None
-                with open(assetsPath("assets/connections.json"), "r") as f:
-                    data = json.load(f)
-                    f.close()
+                with file_lock:
+                    with open(assetsPath("assets/connections.json"), "r") as f:
+                        data = json.load(f)
+                        f.close()
 
                 if not type(data) == list:
                     data = []
@@ -268,9 +274,10 @@ def _requestsMain():
                 if found:
                     data[i]["lastupdate"] = datetime.datetime.now().timestamp() # type: ignore
 
-                    with open(assetsPath("assets/connections.json"), "w") as f:
-                        json.dump(data, f)
-                        f.close()
+                    with file_lock:
+                        with open(assetsPath("assets/connections.json"), "w") as f:
+                            json.dump(data, f, indent=5)
+                            f.close()
                     return JSONResponse({}, status_code=200)
                 
                 return JSONResponse({}, status_code=403)
@@ -283,9 +290,10 @@ def _requestsMain():
         async def fapi_connect(request:Request, name:str):
             try:
                 data = None
-                with open(assetsPath("assets/connections.json"), "r") as f:
-                    data = json.load(f)
-                    f.close()
+                with file_lock:
+                    with open(assetsPath("assets/connections.json"), "r") as f:
+                        data = json.load(f)
+                        f.close()
 
                 if not type(data) == list:
                     data = []
@@ -301,9 +309,10 @@ def _requestsMain():
 
                     data.append(newDict)
 
-                    with open(assetsPath("assets/connections.json"), "w") as f:
-                        json.dump(data, f, indent=5)
-                        f.close()
+                    with file_lock:
+                        with open(assetsPath("assets/connections.json"), "w") as f:
+                            json.dump(data, f, indent=5)
+                            f.close()
 
                     addActivity(f"Added new device: {name}")
 

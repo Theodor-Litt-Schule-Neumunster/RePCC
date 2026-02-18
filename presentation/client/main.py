@@ -125,7 +125,7 @@ def _mdnsMain():
 
         while True:
 
-            time.sleep(5)
+            time.sleep(2)
 
             if PING_SUCCESS == None:
                 print("first time boot. starting...")
@@ -140,7 +140,7 @@ def _mdnsMain():
 
                 try:
 
-                    req = requests.get(f"http://{SERVER_IP}:15247/ping", timeout=.5)
+                    req = requests.get(f"http://{SERVER_IP}:15247/ping", timeout=1)
 
                     if req.status_code == 200:
                         PING_SUCCESS = True
@@ -148,7 +148,7 @@ def _mdnsMain():
 
                     PING_SUCCESS = False
                     continue
-                except TimeoutError:
+                except requests.ReadTimeout:
                     PING_SUCCESS = False
                     print("timeout error")
                     continue
@@ -182,7 +182,10 @@ def _mdnsMain():
 
             global MDNS_ENABLED, SERVER_IP
 
-            info = zc.get_service_info(type_, name)
+            try:
+                info = zc.get_service_info(type_, name)
+            finally:
+                pass
 
             if info and "repccpresentationserver" in name.lower():
                 
@@ -202,6 +205,7 @@ def _mdnsMain():
 
                         # Kill zeroconf and reset vars
                         zeroconf.close() # type: ignore
+                        
                         MDNS_ENABLED = False
                     
                         return
