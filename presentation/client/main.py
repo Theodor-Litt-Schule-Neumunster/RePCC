@@ -4,10 +4,16 @@ import time
 import socket
 import qrcode
 import signal
+import shutil
+import pynput
+import asyncio
+import uvicorn
 import pystray
 import requests
 import ipaddress
 import threading
+import pyautogui
+import pygetwindow
 
 from io import BytesIO
 from PIL import Image
@@ -17,10 +23,25 @@ from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
 
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 
+from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+
 CLIENTWINDOW = None
 MDNS_ENABLED = False
 PING_SUCCESS = None
 SERVER_IP = None
+
+ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore
+
+FAPI = FastAPI(info=True)
+FAPI.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],         
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def assetsPath(relativepath:str):
     """
@@ -213,8 +234,46 @@ def _mdnsMain():
 
     mdnsHandler()
 
+def _httpMain():
+
+    @FAPI.post("/presentaion")
+    async def FAPI_PostPresentation(file: UploadFile):
+        PATH = ROAMING + "\\.RePCC\\presentation"
+        if os.path.exists(PATH):
+            shutil.rmtree(PATH)
+
+        os.makedirs(PATH)
+
+        try:
+            contents = await file.read()
+            filename = file.filename
+
+            with open(f"{PATH}\\{filename}", "wb") as f:
+                f.write(contents)
+                f.close()
+
+            os.startfile(f"{PATH}\\{filename}")
+            time.sleep(2)
+            try:
+                windows = pygetwindow.getWindowsWithTitle(filename)
+                if windows:
+                    print(".")
+                    windows[0].activate()
+            except Exception:
+                pass
+
+            return JSONResponse({}, status_code=200)
+
+        except Exception as e:
+            print(e)
+            return JSONResponse({}, status_code=500)
+
+    @FAPI.get("/next")
+    async def FAPI_next():
+        pyautogui.press("right")
+
 # TODO:
-# - check if connection stays, if not: reopen ZC 
+# - check if connection stays, if not: reopen ZC (Done? idrk atp)
 
 if __name__ == "__main__":
 
@@ -228,6 +287,7 @@ if __name__ == "__main__":
         except:
             return "127.0.0.1"
     
+    _httpMain()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
@@ -247,4 +307,9 @@ if __name__ == "__main__":
 
     threading.Thread(target=_trayMain, args=(CLIENTWINDOW, app), daemon=True).start()
     threading.Thread(target=_mdnsMain, daemon=True).start()
+    threading.Thread(target=uvicorn.run, kwargs={
+        "app": FAPI,
+        "host": "0.0.0.0",
+        "port": 11111 # NOTE: TEST PORT! NORMAL IS 15247
+    }, daemon=True).start()
     sys.exit(app.exec_())

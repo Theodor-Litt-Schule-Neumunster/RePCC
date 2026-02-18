@@ -8,3 +8,5 @@ App/repcc_android/macos/Flutter/GeneratedPluginRegistrant.swift
 App/repcc_android/windows/flutter/generated_plugin_registrant.cc
 App/repcc_android/windows/flutter/generated_plugin_registrant.h
 App/repcc_android/windows/flutter/generated_plugins.cmake
+
+presentation/server/assets/_shared/*

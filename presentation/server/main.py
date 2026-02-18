@@ -2,10 +2,12 @@ import os
 import sys
 import json
 import time
+import shutil
 import socket
 import pystray
 import uvicorn
 import datetime
+import requests
 import threading
 
 from PIL import Image
@@ -16,7 +18,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QListWidget, QScrollArea, QLabel
+    QPushButton, QListWidget, QScrollArea, QLabel, QFileDialog
 )
 
 from fastapi import FastAPI, Request
@@ -59,6 +61,20 @@ class MainWindow(QMainWindow):
         button_reload = QPushButton("Refresh")
         button_reload.clicked.connect(self.loadConnections)
         layout_left.addWidget(button_reload)
+
+        button_select_file = QPushButton("Select File")
+        button_select_file.clicked.connect(self.selectFile)
+        layout_left.addWidget(button_select_file)
+
+        self.selected_file_label = QLabel("No file selected")
+        self.selected_file_label.setWordWrap(True)
+        layout_left.addWidget(self.selected_file_label)
+
+        self.selected_file_path = None
+
+        button_upload = QPushButton("Upload")
+        button_upload.clicked.connect(self.sendFile)
+        layout_left.addWidget(button_upload)
 
         layout_left.addStretch(1)
 
@@ -136,6 +152,68 @@ class MainWindow(QMainWindow):
             self.activateWindow()
 
             self.addActivity("Toggle visibility toggled visible.")
+
+    def selectFile(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select File to Share",
+            "",
+            "All Files (*.*)"
+        )
+        
+        if file_path:
+            self.selected_file_path = file_path
+            file_name = os.path.basename(file_path)
+            self.selected_file_label.setText(f"Selected: {file_name}")
+            self.addActivity(f"File selected: {file_name}")
+            
+            try:
+                destination = assetsPath(f"assets/_shared/{file_name}")
+                shutil.copy2(file_path, destination)
+                self.addActivity(f"File copied to: {destination}")
+            except Exception as e:
+                self.addActivity(f"Error copying file: {str(e)}")
+
+    def sendFile(self):
+        if not self.selected_file_path:
+            self.addActivity("Can't upload file if none is selected.")
+            return
+        
+        try:
+            filename = os.path.basename(self.selected_file_path)
+            
+            files = None
+            connections = None
+            with open(self.selected_file_path, "rb") as f:
+                files = {"file": (filename, f.read())}
+                f.close()
+
+            with file_lock:
+                with open(assetsPath("assets/connections.json")) as f:
+                    connections = json.load(f)
+                    f.close()
+
+            if connections == None:
+                connections = []
+
+            for i in range(len(connections)):
+                data = connections[i]
+
+                ip = data.get("host", None)
+                ad = f"http://{ip}:11111/presentaion" # NOTE: ad as in ADDRESS, NOTE: POST IS TESTPORT! NORMAL IS 15247
+                if not ip == None:
+                    self.addActivity(f"Sending {filename} to {ad}")
+                    r = requests.post(ad, files=files, timeout=5)
+
+                    if r.status_code == 200:
+                        self.addActivity("Successfully uploaded.")
+                    else:
+                        self.addActivity(f"Upload failed with code {r.status_code}")
+
+            self.addActivity(" -- Upload finished.")
+
+        except Exception as e:
+            print(e)
 
 def addActivity(message:str):
     if not WINDOW == None:
