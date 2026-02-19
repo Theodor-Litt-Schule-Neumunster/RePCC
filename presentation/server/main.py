@@ -8,6 +8,7 @@ import pystray
 import uvicorn
 import datetime
 import requests
+import pyautogui
 import threading
 
 from PIL import Image
@@ -75,6 +76,14 @@ class MainWindow(QMainWindow):
         button_upload = QPushButton("Upload")
         button_upload.clicked.connect(self.sendFile)
         layout_left.addWidget(button_upload)
+
+        button_next = QPushButton("Next slide")
+        button_next.clicked.connect(lambda: self.nextClientSlide("next"))
+        layout_left.addWidget(button_next)
+
+        button_prev = QPushButton("Next slide")
+        button_prev.clicked.connect(lambda: self.nextClientSlide("prev"))
+        layout_left.addWidget(button_prev)
 
         layout_left.addStretch(1)
 
@@ -214,6 +223,35 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             print(e)
+
+    def nextClientSlide(self, direction:str="next"):
+        data = None
+
+        with file_lock:
+            try:
+                with open(assetsPath("assets/connections.json")) as f:
+                    data = json.load(f)
+                    f.close()
+            except:
+                pass
+
+        if data == None:
+            data = []
+
+        for i in range(len(data)):
+
+            subdata = data[i]
+            address = subdata.get("host", "None")
+
+            if not address == None:
+
+                http = f"http://{address}:11111/{direction}" # NOTE: TEST PORT!
+                r = requests.get(http)
+
+                if r.status_code == 200:
+                    addActivity(f"Send {direction} slide for {address}")
+                else:
+                    addActivity(f"!! ERROR! Failed {direction} slide for {address} !!")
 
 def addActivity(message:str):
     if not WINDOW == None:
@@ -398,6 +436,18 @@ def _requestsMain():
                 return JSONResponse({}, status_code=405)
             except Exception as e:
                 return JSONResponse({"error":"Connect failed."}, status_code=500)
+
+        @REQ_APP.get("/present/next")
+        async def fapi_present_next(request:Request):
+            if not WINDOW == None:
+                pyautogui.press("right")
+                WINDOW.nextClientSlide("next")
+
+        @REQ_APP.get("/present/prev")
+        async def fapi_present_prev(request:Request):
+            if not WINDOW == None:
+                pyautogui.press("left")
+                WINDOW.nextClientSlide("prev")
 
     requestInit()
 

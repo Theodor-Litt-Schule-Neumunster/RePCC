@@ -5,8 +5,6 @@ import socket
 import qrcode
 import signal
 import shutil
-import pynput
-import asyncio
 import uvicorn
 import pystray
 import requests
@@ -174,6 +172,16 @@ def _mdnsMain():
                     print("timeout error")
                     continue
 
+                except requests.exceptions.ConnectTimeout:
+                    PING_SUCCESS = False
+                    print("timeout error 2")
+                    continue
+
+                except requests.exceptions.ConnectionError:
+                    PING_SUCCESS = False
+                    print("timeout error 3")
+                    continue
+
             if PING_SUCCESS == False and SERVER_IP and MDNS_ENABLED == False:
                 print("Resetting...")
 
@@ -271,6 +279,10 @@ def _httpMain():
     @FAPI.get("/next")
     async def FAPI_next():
         pyautogui.press("right")
+
+    @FAPI.get("/prev")
+    async def FAPI_prev():
+        pyautogui.press("left")
 
 # TODO:
 # - check if connection stays, if not: reopen ZC (Done? idrk atp)

@@ -10,3 +10,5 @@ App/repcc_android/windows/flutter/generated_plugin_registrant.h
 App/repcc_android/windows/flutter/generated_plugins.cmake
 
 presentation/server/assets/_shared/*
+presentation/*/build
+presentation/*/dist
