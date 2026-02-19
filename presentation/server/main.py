@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         button_next.clicked.connect(lambda: self.nextClientSlide("next"))
         layout_left.addWidget(button_next)
 
-        button_prev = QPushButton("Next slide")
+        button_prev = QPushButton("Prev slide")
         button_prev.clicked.connect(lambda: self.nextClientSlide("prev"))
         layout_left.addWidget(button_prev)
 
