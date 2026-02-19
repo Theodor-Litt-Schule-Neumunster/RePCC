@@ -148,25 +148,24 @@ class _MacroScreenState extends State<MacroScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF353535),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
-        title: const Text('Macros', style: TextStyle(color: Colors.white)),
+        title: const Text('Macros'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _upsertMacro(),
-        icon: const Icon(Icons.add, color: Colors.black),
+        icon: const Icon(Icons.add),
         label: const Text('Add Macro'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _macros.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'No macros yet.\nTap “Add Macro” to create one.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70),
+                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
                   ),
                 )
               : ListView.builder(
@@ -175,12 +174,12 @@ class _MacroScreenState extends State<MacroScreen> {
                   itemBuilder: (context, index) {
                     final macro = _macros[index];
                     return Card(
-                      color: const Color(0xFF202020),
+                      color: colorScheme.tertiary,
                       child: ListTile(
                         title: Text(
                           macro.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colorScheme.onTertiary,
                             fontFamily: 'JetBrainsMono',
                           ),
                         ),
@@ -190,13 +189,13 @@ class _MacroScreenState extends State<MacroScreen> {
                               : macro.body.trim().split('\n').first,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white60),
+                          style: TextStyle(color: colorScheme.onTertiary.withOpacity(0.6)),
                         ),
                         onTap: () => _upsertMacro(existing: macro),
                         trailing: IconButton(
                           onPressed: () => _deleteMacro(macro),
-                          icon: const Icon(Icons.delete_outline,
-                              color: Colors.white70),
+                          icon: Icon(Icons.delete_outline,
+                              color: colorScheme.onTertiary.withOpacity(0.7)),
                         ),
                       ),
                     );

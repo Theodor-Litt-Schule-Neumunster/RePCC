@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../models/device.dart';
 import 'connect.dart';
 import 'macros.dart';
@@ -15,10 +17,65 @@ class _HomeScreenState extends State<HomeScreen> {
   // List of devices managed by the state - now starts empty
   List<Device> devices = [];
   bool isGridStyle = false;
+  bool _isRefreshingStatus = false;
+
+  Future<bool> _checkDeviceConnectivity(Device device) async {
+    final portsToCheck = <int>{...device.ports, 15248}.toList();
+
+    for (final port in portsToCheck) {
+      HttpClient? client;
+      try {
+        client = HttpClient()
+          ..connectionTimeout = const Duration(milliseconds: 1200);
+
+        final request = await client.getUrl(
+          Uri.parse('http://${device.ipAddress}:$port/ping'),
+        );
+
+        request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+        final response = await request.close().timeout(
+          const Duration(milliseconds: 1500),
+        );
+
+        final responseBody = await response.transform(utf8.decoder).join();
+        final isStatusOk = response.statusCode == 200 || response.statusCode == 202;
+        final isRepccPayload = responseBody.contains('"message":"Success"') ||
+            responseBody.contains('"message": "Success"');
+
+        if (isStatusOk && isRepccPayload) {
+          return true;
+        }
+      } catch (_) {
+      } finally {
+        client?.close(force: true);
+      }
+    }
+
+    return false;
+  }
+
+  Future<void> _refreshAllDeviceStatuses() async {
+    if (_isRefreshingStatus || devices.isEmpty) return;
+
+    setState(() {
+      _isRefreshingStatus = true;
+    });
+
+    for (final device in devices) {
+      final isConnected = await _checkDeviceConnectivity(device);
+      device.isConnected = isConnected;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isRefreshingStatus = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     const String appTitle = 'RePCC';
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       drawer: Drawer(
         child: ListView(
@@ -26,14 +83,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Color(0xFF202020),
+                color: colorScheme.tertiary,
               ),
               child: Stack(
                 children: [
                   Align(
                     alignment: Alignment.topRight,
                     child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
+                      icon: Icon(Icons.close, color: colorScheme.onTertiary),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
@@ -45,8 +102,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 10),
                         Text(
                           appTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colorScheme.onTertiary,
                             fontSize: 24,
                             fontFamily: 'JetBrainsMono',
                           ),
@@ -59,20 +116,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: SvgPicture.asset('assets/Icons/home.svg',
-                  colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                  colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
                   width: 24,
                   height: 24),
-              title: Text('Home', style: TextStyle(color: Colors.white)),
+              title: Text('Home', style: TextStyle(color: colorScheme.onSurface)),
               onTap: () {
                 Navigator.pop(context);
               },
             ),
             ListTile(
               leading: SvgPicture.asset('assets/Icons/connect.svg',
-                  colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                  colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
                   width: 24,
                   height: 24),
-              title: Text('Connect', style: TextStyle(color: Colors.white)),
+              title: Text('Connect', style: TextStyle(color: colorScheme.onSurface)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context,
@@ -86,13 +143,30 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Center(
             child: Text(
           appTitle,
-          style: TextStyle(color: Colors.white, fontSize: 35),
+          style: TextStyle(color: colorScheme.onTertiary, fontSize: 35),
         )),
         actions: <Widget>[
           IconButton(
+            icon: _isRefreshingStatus
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colorScheme.onTertiary,
+                    ),
+                  )
+                : Icon(
+                    Icons.sync,
+                    color: colorScheme.onTertiary,
+                  ),
+            tooltip: 'Refresh Status',
+            onPressed: _isRefreshingStatus ? null : _refreshAllDeviceStatuses,
+          ),
+          IconButton(
             icon: Icon(
               isGridStyle ? Icons.view_agenda : Icons.grid_view,
-              color: Colors.white,
+              color: colorScheme.onTertiary,
             ),
             tooltip: isGridStyle ? 'Einfache Liste' : 'Kachelansicht',
             onPressed: () {
@@ -103,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: SvgPicture.asset('assets/Icons/info.svg',
-                colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                colorFilter: ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
                 width: 24,
                 height: 24),
             onPressed: () {
@@ -132,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 'Added Devices',
                 style: TextStyle(
-                    color: Colors.white,
+                  color: colorScheme.onSurface,
                     fontSize: 24,
                     fontFamily: 'JetBrainsMono'),
               ),
@@ -143,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: double.infinity,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: colorScheme.onSurface.withOpacity(0.24),
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -217,6 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
 
                     if (newDevice != null && newDevice is Device) {
+                      newDevice.isConnected = await _checkDeviceConnectivity(newDevice);
                       setState(() {
                         devices.add(newDevice);
                       });
@@ -239,19 +314,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDeviceCard(Device device, VoidCallback onDelete) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      color: device.isConnected ? Color(0xFF404040) : Color(0xFF202020),
+      color: device.isConnected ? colorScheme.tertiary : colorScheme.surface,
       child: ListTile(
         leading: SvgPicture.asset(
           'assets/Icons/computer.svg',
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
           width: 24,
           height: 24,
         ),
         title: Text(
           device.name,
           style: TextStyle(
-              color: Colors.white,
+              color: colorScheme.onSurface,
               fontFamily: 'JetBrainsMono',
               fontWeight: FontWeight.normal),
         ),
@@ -261,13 +337,14 @@ class _HomeScreenState extends State<HomeScreen> {
             Text.rich(
               TextSpan(
                 text: 'Status: ',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12),
                 children: [
                   TextSpan(
-                    text: device.isConnected ? 'Connected' : 'Disconnected',
+                    text: device.isConnected ? 'Reachable' : 'Unreachable',
                     style: TextStyle(
-                        color:
-                            device.isConnected ? Colors.green : Colors.white70),
+                        color: device.isConnected
+                            ? colorScheme.primary
+                            : colorScheme.onSurface.withOpacity(0.7)),
                   ),
                 ],
               ),
@@ -276,21 +353,21 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               'IP: ${device.ipAddress}',
               style: TextStyle(
-                  color: Colors.white60,
+                  color: colorScheme.onSurface.withOpacity(0.6),
                   fontSize: 11,
                   fontFamily: 'JetBrainsMono'),
             ),
             Text(
               'MAC: ${device.macAddress}',
               style: TextStyle(
-                  color: Colors.white60,
+                  color: colorScheme.onSurface.withOpacity(0.6),
                   fontSize: 11,
                   fontFamily: 'JetBrainsMono'),
             ),
             Text(
               'Ports: ${device.ports.join(", ")}',
               style: TextStyle(
-                  color: Colors.white60,
+                  color: colorScheme.onSurface.withOpacity(0.6),
                   fontSize: 11,
                   fontFamily: 'JetBrainsMono'),
             ),
@@ -300,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: onDelete,
           icon: SvgPicture.asset(
             'assets/Icons/delete.svg',
-            colorFilter: ColorFilter.mode(Colors.white70, BlendMode.srcIn),
+            colorFilter: ColorFilter.mode(colorScheme.onSurface.withOpacity(0.7), BlendMode.srcIn),
             width: 24,
             height: 24,
           ),
@@ -310,8 +387,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDeviceGridCard(Device device, VoidCallback onDelete) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      color: device.isConnected ? Color(0xFF404040) : Color(0xFF202020),
+      color: device.isConnected ? colorScheme.tertiary : colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: Column(
@@ -321,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 SvgPicture.asset(
                   'assets/Icons/computer.svg',
-                  colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                  colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
                   width: 20,
                   height: 20,
                 ),
@@ -332,15 +410,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: Colors.white, fontFamily: 'JetBrainsMono'),
+                        color: colorScheme.onSurface, fontFamily: 'JetBrainsMono'),
                   ),
                 ),
                 IconButton(
                   onPressed: onDelete,
                   icon: SvgPicture.asset(
                     'assets/Icons/delete.svg',
-                    colorFilter:
-                        ColorFilter.mode(Colors.white70, BlendMode.srcIn),
+                    colorFilter: ColorFilter.mode(
+                        colorScheme.onSurface.withOpacity(0.7), BlendMode.srcIn),
                     width: 18,
                     height: 18,
                   ),
@@ -351,9 +429,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              device.isConnected ? 'Connected' : 'Disconnected',
+              device.isConnected ? 'Reachable' : 'Unreachable',
               style: TextStyle(
-                color: device.isConnected ? Colors.green : Colors.white70,
+                color: device.isConnected
+                    ? colorScheme.primary
+                    : colorScheme.onSurface.withOpacity(0.7),
                 fontSize: 12,
               ),
             ),
@@ -363,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  color: Colors.white60,
+                  color: colorScheme.onSurface.withOpacity(0.6),
                   fontSize: 11,
                   fontFamily: 'JetBrainsMono'),
             ),
@@ -372,7 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  color: Colors.white60,
+                  color: colorScheme.onSurface.withOpacity(0.6),
                   fontSize: 11,
                   fontFamily: 'JetBrainsMono'),
             ),
@@ -381,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  color: Colors.white60,
+                  color: colorScheme.onSurface.withOpacity(0.6),
                   fontSize: 11,
                   fontFamily: 'JetBrainsMono'),
             ),

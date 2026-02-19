@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../models/device.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 import 'dart:async';
@@ -75,15 +74,30 @@ class _ConnectScreenState extends State<ConnectScreen> {
     return localAddresses.any((local) => _isSameSubnet24(discoveredIp, local.address));
   }
 
+  int? _extractSocketErrorCode(Object error) {
+    if (error is SocketException) return error.osError?.errorCode;
+    if (error is OSError) return error.errorCode;
+
+    final match = RegExp(r'errno\s*=\s*(\d+)').firstMatch(error.toString());
+    return match != null ? int.tryParse(match.group(1)!) : null;
+  }
+
   String _scanErrorMessage(Object error) {
+    final errorCode = _extractSocketErrorCode(error);
+
+    if (Platform.isWindows && errorCode == 10042) {
+      return 'mDNS konnte unter Windows nicht gestartet werden (Socket-Option nicht unterstützt, errno 10042). '
+          'Häufige Ursache: VPN/virtuelle Netzwerkadapter oder Firewall. Bitte diese kurz deaktivieren und erneut scannen.';
+    }
+
     if (error is SocketException) {
-      final errorCode = error.osError?.errorCode;
-      if (Platform.isWindows && errorCode == 10042) {
-        return 'mDNS konnte unter Windows nicht gestartet werden (Socket Option nicht unterstützt). '
-            'Das liegt nicht daran, dass kein Server läuft. Bitte VPN/Firewall prüfen und erneut versuchen.';
-      }
       return 'Network error while scanning: ${error.message}';
     }
+
+    if (error is OSError) {
+      return 'Network error while scanning: ${error.message}';
+    }
+
     return 'Error scanning: $error';
   }
 
@@ -191,7 +205,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
         ipAddress: ipAddress,
         macAddress: 'Unknown',
         ports: [8080],
-        isConnected: true,
+        isConnected: false,
       );
 
       Navigator.pop(context, newDevice);
@@ -205,7 +219,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Connect'),
+      ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -216,7 +234,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
           children: [
             Text(
               'Connect a new Device',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontFamily: 'JetBrainsMono', fontWeight: FontWeight.normal),
+              style: TextStyle(color: colorScheme.onSurface, fontSize: 20, fontFamily: 'JetBrainsMono', fontWeight: FontWeight.normal),
             ),
             const SizedBox(height: 20),
             
@@ -227,7 +245,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   ? SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
                     )
                   : Icon(Icons.search),
               label: Text(_isScanning ? 'Scanning...' : 'Scan for Devices', style: TextStyle(fontFamily: 'JetBrainsMono')),
@@ -241,7 +259,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             // Status message
             Text(
               _statusMessage,
-              style: TextStyle(color: Colors.white70, fontSize: 14, fontFamily: 'JetBrainsMono'),
+              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 14, fontFamily: 'JetBrainsMono'),
               textAlign: TextAlign.center,
             ),
             
@@ -253,7 +271,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   ? Center(
                       child: Text(
                         'No devices discovered yet',
-                        style: TextStyle(color: Colors.white54, fontFamily: 'JetBrainsMono'),
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.54), fontFamily: 'JetBrainsMono'),
                       ),
                     )
                   : ListView.builder(
@@ -261,22 +279,22 @@ class _ConnectScreenState extends State<ConnectScreen> {
                       itemBuilder: (context, index) {
                         final device = _discoveredDevices[index];
                         return Card(
-                          color: Color(0xFF202020),
+                          color: colorScheme.tertiary,
                           child: ListTile(
-                            leading: Icon(Icons.computer, color: Colors.white),
+                            leading: Icon(Icons.computer, color: colorScheme.onTertiary),
                             title: Text(
                               device.name,
-                              style: TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono'),
+                              style: TextStyle(color: colorScheme.onTertiary, fontFamily: 'JetBrainsMono'),
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('IP: ${device.ipAddress}', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                Text('MAC: ${device.macAddress}', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                Text('Ports: ${device.ports.join(", ")}', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                Text('IP: ${device.ipAddress}', style: TextStyle(color: colorScheme.onTertiary.withOpacity(0.7), fontSize: 12)),
+                                Text('MAC: ${device.macAddress}', style: TextStyle(color: colorScheme.onTertiary.withOpacity(0.7), fontSize: 12)),
+                                Text('Ports: ${device.ports.join(", ")}', style: TextStyle(color: colorScheme.onTertiary.withOpacity(0.7), fontSize: 12)),
                               ],
                             ),
-                            trailing: Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
+                            trailing: Icon(Icons.arrow_forward_ios, color: colorScheme.onTertiary.withOpacity(0.7), size: 16),
                             onTap: () => _selectDevice(device),
                           ),
                         );
@@ -290,10 +308,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
             ExpansionTile(
               title: Text(
                 'Or Add Manually',
-                style: TextStyle(color: Colors.white70, fontFamily: 'JetBrainsMono', fontSize: 14),
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontFamily: 'JetBrainsMono', fontSize: 14),
               ),
-              iconColor: Colors.white70,
-              collapsedIconColor: Colors.white70,
+              iconColor: colorScheme.onSurface.withOpacity(0.7),
+              collapsedIconColor: colorScheme.onSurface.withOpacity(0.7),
               children: [
                 Padding(
                   padding: const EdgeInsets.all(10),
@@ -301,30 +319,30 @@ class _ConnectScreenState extends State<ConnectScreen> {
                     children: [
                       TextField(
                         controller: _nameController,
-                        style: const TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono'),
+                        style: TextStyle(color: colorScheme.onSurface, fontFamily: 'JetBrainsMono'),
                         decoration: InputDecoration(
                           hintText: 'Enter Device Name',
-                          hintStyle: TextStyle(color: Colors.white54, fontFamily: 'JetBrainsMono'),
+                          hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.54), fontFamily: 'JetBrainsMono'),
                           enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white30),
+                            borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.3)),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white),
+                            borderSide: BorderSide(color: colorScheme.primary),
                           ),
                         ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _ipController,
-                        style: const TextStyle(color: Colors.white, fontFamily: 'JetBrainsMono'),
+                        style: TextStyle(color: colorScheme.onSurface, fontFamily: 'JetBrainsMono'),
                         decoration: InputDecoration(
                           hintText: 'Enter IP Address',
-                          hintStyle: TextStyle(color: Colors.white54, fontFamily: 'JetBrainsMono'),
+                          hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.54), fontFamily: 'JetBrainsMono'),
                           enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white30),
+                            borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.3)),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white),
+                            borderSide: BorderSide(color: colorScheme.primary),
                           ),
                         ),
                       ),
@@ -340,21 +358,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
             ),
             
             const SizedBox(height: 20),
-            
-            // Back button
-            FloatingActionButton(
-              heroTag: 'back',
-              backgroundColor: Colors.grey[800],
-              onPressed: () {
-                Navigator.pop(context);
-              }, 
-              child: SvgPicture.asset(
-                'assets/Icons/arrow_back.svg',
-                width: 24,
-                height: 24,
-                colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              ),
-            ),
           ],
         ),
       ),
