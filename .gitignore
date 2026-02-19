@@ -1,5 +1,6 @@
 __pycache__
 .vscode
+.spec
 Backend/windows/build
 Backend/windows/dist
 Backend/windows/*.spec
