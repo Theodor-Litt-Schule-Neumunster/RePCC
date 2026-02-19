@@ -164,7 +164,7 @@
             if (!ip) return;
             
             try {
-                await fetch(`http://${ip}:11111/present/next`);
+                await fetch(`http://${ip}:15247/present/next`);
             } catch (error) {
                 console.error('Next slide error:', error);
             }
@@ -175,7 +175,7 @@
             if (!ip) return;
             
             try {
-                await fetch(`http://${ip}:11111/present/prev`);
+                await fetch(`http://${ip}:15247/present/prev`);
             } catch (error) {
                 console.error('Prev slide error:', error);
             }
@@ -186,7 +186,7 @@
             if (!ip) return;
             
             saveServerIp();
-            const webrtcUrl = `http://${ip}:15248`;
+            const webrtcUrl = `http://${ip}:15249`;
             
             try {
                 setStatus('Connecting...', 'connecting');

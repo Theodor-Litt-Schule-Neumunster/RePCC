@@ -506,5 +506,10 @@ def _trayMain():
         print(e)
 
 if __name__ == "__main__":
+    with file_lock:
+        with open(assetsPath("assets/connections.json"), "w") as f:
+            json.dump([], f)
+            f.close()
+
     threading.Thread(target=_trayMain).start()
     threading.Thread(target=_requestsMain).start()

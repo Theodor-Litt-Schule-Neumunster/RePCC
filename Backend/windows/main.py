@@ -483,7 +483,7 @@ if __name__ == "__main__":
 
     if os.name == "nt":
         logger.info(f"main | Request server started.")
-        uvicorn.run(App, host="0.0.0.0", port=15248, log_level="critical")
+        uvicorn.run(App, host="0.0.0.0", port=15248)
         logger.info("\n---------------------END---------------------\n") # Not guaranteed to be in log
     else:
         logger.error(f"main | App started on an operating system that is not NTFS.")
