@@ -15,7 +15,7 @@ class ConnectScreen extends StatefulWidget {
 class _ConnectScreenState extends State<ConnectScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _ipController = TextEditingController();
-  List<Device> _discoveredDevices = [];
+  final List<Device> _discoveredDevices = [];
   bool _isScanning = false;
   String _statusMessage = 'Press scan to discover devices';
 
