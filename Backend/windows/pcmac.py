@@ -25,7 +25,7 @@ try:
 except:
     logger = forceLogFolder()
 
-APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
+APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
 
@@ -553,7 +553,8 @@ def initializePCMAC():
             "settings",
             "assets",
             "logs",
-            "data"
+            "data",
+            "applications"
         ],
     }
     def fileVerification():
@@ -615,7 +616,13 @@ def initializePCMAC():
             fileVerification()
     
     def regVerification():
+
+        # NOTE: Change in the future to check every key
+        # NOTE: Primary application will be in APPDATA/Roaming/.RePCC/Application
+
         logger.info(f"pcmac | regedit: Attempting.")
+        registryChanged = False
+
         def restartExplorer():
             try:
                 logger.info(f"pcmac | regedit: Restarting explorer.exe...")
@@ -624,32 +631,47 @@ def initializePCMAC():
                 logger.info(f"pcmac | regedit: Successfully restarted explorer.")
             except Exception as e:
                 logger.error(customerror("pcmac", e))
+
+        def ensure_registry_value(root, key_path:str, value_name:str|None, expected_value:str):
+            nonlocal registryChanged
+
+            key = winreg.CreateKey(root, key_path)
+            current_value = None
+
+            try:
+                current_value, _ = winreg.QueryValueEx(key, value_name)
+            except FileNotFoundError:
+                current_value = None
+
+            if current_value != expected_value:
+                winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, expected_value)
+                registryChanged = True
+                logger.info(f"pcmac | regedit: Set value for HKCR\\{key_path} ({'(Default)' if value_name is None else value_name}).")
+
+            winreg.CloseKey(key)
+
         if ctypes.windll.shell32.IsUserAnAdmin():
             logger.info(f"pcmac | regedit: Is running with administrative privileges.")
-            def keySearch():
-                try:
-                    key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, ".pcmac")
-                    winreg.CloseKey(key)
-                    return True
-                except FileNotFoundError:
-                    logger.info(f"pcmac | regedit: Key does not exsist.")
-                    return False
-        
-            if not keySearch():
-                ext_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ".pcmac")
-                winreg.SetValueEx(ext_key, None, 0, winreg.REG_SZ, "RePCC_File")
-                winreg.CloseKey(ext_key)
-                progid_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, "RePCC_File")
-                winreg.SetValueEx(progid_key, None, 0, winreg.REG_SZ, "RePCC File")
-                icon_key = winreg.CreateKey(progid_key, "DefaultIcon")
-                winreg.SetValueEx(icon_key, None, 0, winreg.REG_SZ, MACDATA+"\\assets\\script.ico") # Takes ico from roaming repcc
-                winreg.CloseKey(icon_key)
-                winreg.CloseKey(progid_key)
+            try:
+                openfileExe = MACDATA + "\\applications\\openfile.exe"
+                openCommand = f'"{openfileExe}" "%1"'
 
-                logger.info(f"pcmac | regedit: Successfully created all keys.")
-                restartExplorer()
-            else:
-                logger.info(f"pcmac | regedit: Key exsits.")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, ".pcmac", None, "RePCC_File")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File", None, "RePCC File")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\DefaultIcon", None, MACDATA+"\\assets\\script.ico")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\shell", None, "open")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\shell\\open", None, "Open with RePCC")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\shell\\open\\command", None, openCommand)
+
+                if registryChanged:
+                    logger.info(f"pcmac | regedit: Registry keys verified and updated.")
+                    restartExplorer()
+                else:
+                    logger.info(f"pcmac | regedit: All required keys already exist and are correct.")
+
+            except Exception as e:
+                logger.error("pcmac | ERROR @ pcmac.py/initializePCMAC/regVerification")
+                logger.error(customerror("pcmac", e))
         else:
             logger.error(customerror("pcmac", "Script is not running as administrator. Can not complete registry verification."))
 

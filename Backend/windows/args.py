@@ -32,7 +32,7 @@ RANDOM_ERROR_LIST = [
     ":("
 ]
 
-ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
+ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 TWOFACODE = None
 
 LOGGER_CONF = {
@@ -107,13 +107,13 @@ def sendNotification(title:str, body:str):
         toast(
             title=title,
             body=body,
-            icon=assetsPath("assets/repcclogo.ico"),
+            app_id="RePCC",
             duration="short"
         )
 
     threading.Thread(target=_).start()
 
-def getDebugSettings() -> dict:
+def getDebugSettings():
     """
     Fetches the settings for DEBUG yaml in user roaming.
     """
@@ -127,7 +127,7 @@ def getDebugSettings() -> dict:
     
     return None
 
-def getRegistryYaml() -> dict:
+def getRegistryYaml():
     """
     Fetches the entries for REGISTRY yaml in user roaming.
     """
@@ -140,7 +140,7 @@ def getRegistryYaml() -> dict:
     
     return None
 
-def getPresentationSettings() -> dict:
+def getPresentationSettings():
     """
     Fetches the settings for PRESENTATIONTOOLS yaml in user roaming.
     """
@@ -154,13 +154,13 @@ def getPresentationSettings() -> dict:
     
     return None
 
-def findRegisteredHost(ip:str) -> bool:
+def findRegisteredHost(ip:str):
     try:
         registerYAML = getRegistryYaml()
         debugYAML = getDebugSettings()
 
         if registerYAML == None or debugYAML == None:
-            return None
+            return False
 
         _debug_allowExternal = debugYAML.get("allowExternalRequests", False)
 

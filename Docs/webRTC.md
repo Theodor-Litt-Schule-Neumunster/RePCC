@@ -41,3 +41,8 @@ Die geschickten Daten werden in einen JSON format erwartet. Ungefair so:
 ```
 
 Der Server übernimmt den Rest.
+
+# WICHTIG!
+
+Wenn die verbindung geschlossen wird, durch App-Schließen u. s. w, dann muss ein disconnect zum WebRTC server geschickt werden, durch den DC.
+Wenn es nicht gemacht wird, besteht die Chance, dass ein Laserpointer gestartet wird, und durch den Alten WebRTC datatunnel im mitten vom benutzen, wieder geschlossen.

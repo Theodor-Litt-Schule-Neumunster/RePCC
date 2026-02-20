@@ -314,6 +314,12 @@
                 document.addEventListener("touchcancel", touchEndEvent);
             }, { passive: false });
         });
+
+        window.addEventListener('beforeunload', () => {
+            if (dc && dc.readyState === 'open') {
+                dc.send(JSON.stringify({type: 'disconnect'}));
+            }
+        });
     </script>
 </body>
 </html>

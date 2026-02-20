@@ -1,14 +1,22 @@
+
+# pyinstaller --onefile --noconsole --manifest base/manifest.manifest --add-data "assets;assets" --icon="./assets/repccBin.ico" main.py
+
+# Debugger notes: Please run VSC as Administrator to debug this within VSC. ( Or any IDE you're using )
+
 # imports
 
 import os
+import sys
 import uuid
 import yaml
 import json
 import socket
+import ctypes
 import pystray
 import logging
 import uvicorn
 import threading
+import subprocess
 import logging.config
 
 # --
@@ -24,12 +32,12 @@ from zeroconf import Zeroconf, ServiceInfo
 
 # --
 # custom imports
-from pcmac import initializePCMAC, macro
 from webrtc import startWebRTCServer
-
-# Multiline because it was getting a little too long
-from args import LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath, getSetting
-from args import sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost
+from pcmac import initializePCMAC, macro
+from args import (
+    LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath, getSetting,
+    sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost
+)
 
 # --
 
@@ -61,10 +69,10 @@ def requestsInit():
         macsYaml = getRegistryYaml()
 
         if not macsYaml["IP"] == None:
-            if request.client.host in macsYaml["IP"]: # type: ignore[attr-defined]
+            if request.client.host in macsYaml["IP"]:
                 return JSONResponse({"message":"Success"}, status_code=202)
 
-        logger.info(f"main | Recieved ping from {request.client.host}. Responding with OK") # type: ignore[attr-defined]
+        logger.info(f"main | Recieved ping from {request.client.host}. Responding with OK")
         return JSONResponse({"message":"Success"}, status_code=200)
 
     def _macroRequests():
@@ -72,7 +80,7 @@ def requestsInit():
         @App.get("/macro/getall")
         async def macros_getall(request:Request): # NOTE: Has IP check now
 
-            logger.info(f"main | getall request recieded by {request.client.host}") #type: ignore
+            logger.info(f"main | getall request recieded by {request.client.host}")
 
             if not findRegisteredHost(request.client.host): #type: ignore
                 logger.error("main | ERROR @ main.py/requestsInit/_macroRequests/macros_getall")
@@ -85,9 +93,9 @@ def requestsInit():
 
         @App.get("/macro/get/{name}")
         async def macros_getone(request:Request, name:str): # NOTE: Has IP check now
-            logger.info(f"main | getone request recieded by {request.client.host}") #type: ignore
+            logger.info(f"main | getone request recieded by {request.client.host}")
 
-            if not findRegisteredHost(request.client.host): #type: ignore
+            if not findRegisteredHost(request.client.host):
                 logger.error("main | ERROR @ main.py/requestsInit/_macroRequests/macros_getone")
                 logger.error("main | Unauthorized host attempted to access macros_getone.")
                 return JSONResponse({"error":"Not allowed"}, status_code=405)
@@ -449,6 +457,55 @@ def wipeSavedIPs():
     yaml.safe_dump(register, open(ROAMING+"\\.RePCC\\data\\register.yaml", "w"))
     logger.info(f"main | IPs wiped. Registry data: {register}")
 
+def firewallInit():
+
+    # RePCC Ports:
+    # - 15247 Presentation Port
+    # - 15248 Default Port
+    # - 15249 WerRTC Port
+
+    logger.info("main | Checking firewall rules...")
+
+    def _firewall_rule_exists(rule_name: str) -> bool:
+        result = subprocess.run(
+            ["netsh", "advfirewall", "firewall", "show", "rule", f"name={rule_name}"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        out = (result.stdout or "").lower()
+        return "no rules match" not in out
+
+    rules = [
+        (".RePCC 15248 In", "TCP", 15248),
+        (".RePCC 15249 In", "TCP", 15249),
+    ]
+
+    for name, protocol, port in rules:
+        if _firewall_rule_exists(name):
+            logger.info(f"main | Firewall rule already exists: {name}")
+            continue
+
+        result = subprocess.run(
+            [
+                "netsh", "advfirewall", "firewall", "add", "rule",
+                f"name={name}",
+                "dir=in",
+                "action=allow",
+                f"protocol={protocol}",
+                f"localport={port}",
+                "profile=private,domain"
+            ],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode == 0:
+            logger.info(f"main | Firewall rule created: {name}")
+        else:
+            logger.error(customerror("main", f"Failed firewall rule: {name} | {result.stderr.strip()}"))
+
 #   --------------- MAIN 
 
 # TODO:
@@ -458,19 +515,55 @@ def wipeSavedIPs():
 # - Fix trail from laserpointer not disappearing when let go
 # - Add variable trail length in settings
 
-if __name__ == "__main__":
+def MAIN():
+
+    def is_admin():
+        try:
+            logger.info("main | Checking admin...")
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            logger.info("main | is not admin.")
+            return False
+        
+    def run_as_admin():
+        # integrating this was hell
+        if not is_admin():
+            if getattr(sys, "frozen", False):
+                lp_file = os.path.abspath(sys.executable)
+                lp_params = subprocess.list2cmdline(sys.argv[1:])
+                lp_dir = os.path.dirname(lp_file)
+            else:
+                lp_file = os.path.abspath(sys.executable)  # python.exe
+                script = os.path.abspath(sys.argv[0])
+                lp_params = subprocess.list2cmdline([script, *sys.argv[1:]])
+                lp_dir = os.path.dirname(script)
+
+            rc = ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", lp_file, lp_params, lp_dir, 1
+            )
+
+            if rc <= 32:
+                logger.error(customerror("main", f"Admin failed. ShellExecuteW rc={rc}"))
+                return
+            
+            logger.info("\n\n-------------------RESTART-------------------")
+            sys.exit(0)
+
+        logger.info("main | Script is running in admin! Yippie!")
 
     logger.info("\n\n--------------------START--------------------")
     logger.info("Wakey wakey eggs 'n bakey! Time to run!")
 
-    NEW2FA()
-
-    logger.info("main | Running initual functions at startup...")
-    wipeSavedIPs()
-    requestsInit()
+    run_as_admin()
 
     logger.info("main | Initializing .pcmac")
     initializePCMAC()
+    NEW2FA()
+
+    logger.info("main | Running initial functions at startup...")
+    wipeSavedIPs()
+    requestsInit()
+    firewallInit()
 
     logger.info("main | Initializing mDNS")
     MDNS, SERVICEINFO = registerMDNS()
@@ -487,3 +580,5 @@ if __name__ == "__main__":
         logger.info("\n---------------------END---------------------\n") # Not guaranteed to be in log
     else:
         logger.error(f"main | App started on an operating system that is not NTFS.")
+
+MAIN()
