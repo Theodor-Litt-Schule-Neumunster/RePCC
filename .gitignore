@@ -15,3 +15,5 @@ presentation/*/build
 presentation/*/dist
 
 *.exe
+
+Backend/*/startmaintest.bat
