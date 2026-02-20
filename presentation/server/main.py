@@ -26,6 +26,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore
+
 file_lock = threading.Lock()
 
 REQ_APP = FastAPI(info=True)
@@ -175,13 +177,6 @@ class MainWindow(QMainWindow):
             file_name = os.path.basename(file_path)
             self.selected_file_label.setText(f"Selected: {file_name}")
             self.addActivity(f"File selected: {file_name}")
-            
-            try:
-                destination = assetsPath(f"assets/_shared/{file_name}")
-                shutil.copy2(file_path, destination)
-                self.addActivity(f"File copied to: {destination}")
-            except Exception as e:
-                self.addActivity(f"Error copying file: {str(e)}")
 
     def sendFile(self):
         if not self.selected_file_path:
