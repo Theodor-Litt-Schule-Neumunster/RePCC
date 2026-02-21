@@ -21,6 +21,9 @@ import logging.config
 import re
 import xml.etree.ElementTree as ET
 
+# Windows process creation flag to hide console windows
+CREATE_NO_WINDOW = 0x08000000
+
 # --
 # from's
 
@@ -439,6 +442,7 @@ def _autostart_task_exists() -> bool:
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=CREATE_NO_WINDOW,
         check=False
     )
     return result.returncode == 0
@@ -453,6 +457,7 @@ def _autostart_enabled() -> bool:
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=CREATE_NO_WINDOW,
         check=False
     )
 
@@ -485,6 +490,7 @@ def _autostart_enabled() -> bool:
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=CREATE_NO_WINDOW,
         check=False
     )
 
@@ -522,6 +528,7 @@ def _create_autostart_task() -> bool:
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=CREATE_NO_WINDOW,
         check=False
     )
 
@@ -549,6 +556,7 @@ def _set_autostart_enabled(enable: bool) -> bool:
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=CREATE_NO_WINDOW,
         check=False
     )
 
@@ -695,6 +703,7 @@ def firewallInit():
             text=True,
             encoding="utf-8",
             errors="replace",
+            creationflags=CREATE_NO_WINDOW,
             check=False
         )
         out = (result.stdout or "").lower()
@@ -725,6 +734,7 @@ def firewallInit():
             text=True,
             encoding="utf-8",
             errors="replace",
+            creationflags=CREATE_NO_WINDOW,
             check=False
         )
 

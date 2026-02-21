@@ -19,6 +19,9 @@ import logging.config
 from pynput.keyboard import Controller, Key, Listener, KeyCode
 from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath, sendNotification
 
+# Windows process creation flag to hide console windows
+CREATE_NO_WINDOW = 0x08000000
+
 try:
     logging.config.dictConfig(LOGGER_CONF)
     logger = logging.getLogger("RePCC")
@@ -626,8 +629,8 @@ def initializePCMAC():
         def restartExplorer():
             try:
                 logger.info(f"pcmac | regedit: Restarting explorer.exe...")
-                subprocess.run(["taskkill", "/f", "/im", "explorer.exe"])
-                subprocess.run(["explorer.exe"])
+                subprocess.run(["taskkill", "/f", "/im", "explorer.exe"], creationflags=CREATE_NO_WINDOW)
+                subprocess.run(["explorer.exe"], creationflags=CREATE_NO_WINDOW)
                 logger.info(f"pcmac | regedit: Successfully restarted explorer.")
             except Exception as e:
                 logger.error(customerror("pcmac", e))
