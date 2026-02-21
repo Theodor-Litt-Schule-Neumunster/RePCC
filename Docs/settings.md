@@ -1,86 +1,96 @@
 # Settings
 
-Natürlich wollen wir, dass der Benutzer manche sachen von RePCC einstellen kann.
+Natürlich sollen Benutzer einige RePCC-Einstellungen selbst anpassen können.
 
-Wir haben folgene Dateien, die als Einstellungen agieren:
+Folgende Dateien werden als Einstellungen verwendet:
 
-- debug (Debug einstellungen wie externe Verbindungen erlauben u.s.w)
-- presentationTools (Einstellungen von den Clicker-Buttons und Laserpointer)
-- webrtc (Einstellung der Bildschirmspiegelung wie Videoqualität und FPS)
+- `debug` (Debug-Einstellungen, z. B. externe Verbindungen erlauben)
+- `presentationTools` (Einstellungen für Clicker-Buttons und Laserpointer)
+- `webrtc` (Einstellungen für Bildschirmspiegelung wie Videoqualität und FPS)
 
-### Load settings
----
+## Load Settings
 
-Der Server hat folgene Requests um die Einstellungen zu returnen:
+Der Server stellt folgende Request-URL bereit, um Einstellungen abzurufen:
 
-```
+```text
 http://ip:15248/settins/get/{arg}
 ```
 
-Hier steht ARG für die möglichkeit, eine bestimmte Einstellung zu bekommen oder alle möglichen Einstellungen in einer liste
+`{arg}` steht für den Namen einer bestimmten Einstellung oder für `all`, um alle verfügbaren Einstellungsdateien zu erhalten.
 
-also,
+Beispiel:
 
-```
+```text
 http://ip:15248/settins/get/all
 ```
+
 Return:
-```
+
+```text
 [debug, presentationTools, webrtc]
 ```
----
-Wenn wir nun einer der namen als ARG nehmen, werden alle einstellungen als JSON zurückgesendet.
 
-also,
+Wenn statt `all` ein einzelner Name als `{arg}` verwendet wird, werden die zugehörigen Einstellungen als JSON zurückgegeben.
 
-```
+Beispiel:
+
+```text
 http://ip:15248/settins/get/presentationTools
 ```
+
 Return:
-```json
-{
-    "laserpointer": {
-        "style":"trail",
-        "fadetime":1000,
-        "corecolor":[255,0,0,255],
-        "refreshrate":30,
-        "traillength":100,
-        "size":10
-    },
-    "buttons": {
-        "forward":"right",
-        "backward":"left"
-    }
-}
-```
----
-
-### Save Settings
-
-Sagen wir, wir möchten die Präsentationstools updaten.
-Der user hat die Einstellung geändert und möchte, dass die Größe 30 ist, statt 10.
-
-So würde dann der neue EinstellJSONBlock aussehen:
 
 ```json
 {
     "laserpointer": {
-        "style":"trail",
-        "fadetime":1000,
-        "corecolor":[255,0,0,255],
-        "refreshrate":30,
-        "traillength":100,
-        "size":30
+        "style": "trail",
+        "fadetime": 1000,
+        "corecolor": [255, 0, 0, 255],
+        "refreshrate": 30,
+        "traillength": 100,
+        "size": 10
     },
     "buttons": {
-        "forward":"right",
-        "backward":"left"
+        "forward": "right",
+        "backward": "left"
     }
 }
 ```
 
-Diese schicken wir im Body von der Post-Request zu der URL (mit JSON header, natürlich.) `http://ip:15248/settins/post/{NAME}`, also in unserem Fall: `http://ip:15248/settins/post/presentationTools`. NAME in der URL ist der DateiName der Einstellung.
+## Save Settings
 
-Die Datei wird mit dem neuen Block ersetzt, also MUSS UNBEDINGT der GANZE einstellblock mitgesendet werden.
+Beispiel: Die Präsentationstools sollen aktualisiert werden.
+Der Benutzer ändert die Laserpointer-Größe von `10` auf `30`.
 
-Danach gibts ein schnönen Code 200, wenn alles sauber verläuft.
+Der neue JSON-Block sieht dann so aus:
+
+```json
+{
+    "laserpointer": {
+        "style": "trail",
+        "fadetime": 1000,
+        "corecolor": [255, 0, 0, 255],
+        "refreshrate": 30,
+        "traillength": 100,
+        "size": 30
+    },
+    "buttons": {
+        "forward": "right",
+        "backward": "left"
+    }
+}
+```
+
+Diesen Block sendest du im Body einer POST-Request (mit JSON-Header) an:
+
+`http://ip:15248/settins/post/{NAME}`
+
+In diesem Beispiel also:
+
+`http://ip:15248/settins/post/presentationTools`
+
+`{NAME}` ist der Dateiname der Einstellung.
+
+Die Datei wird vollständig durch den neuen Block ersetzt. Deshalb muss immer der komplette Einstellungsblock gesendet werden.
+
+Bei erfolgreichem Ablauf antwortet der Server mit Statuscode `200`.

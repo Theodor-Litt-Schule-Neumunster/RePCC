@@ -1,4 +1,4 @@
-Gefolgt ist wie der Flutter-Client guckt, ob der Server noch lebendig ist.
+So prüft der Flutter-Client, ob der Server noch erreichbar ist.
 
 ```
         Client              Server
@@ -24,6 +24,9 @@ Gefolgt ist wie der Flutter-Client guckt, ob der Server noch lebendig ist.
           Ping only w/ refresh button 
 ```
 
-Bei regestrierten IPs wird der ping request den code 200 zurück.
-Jedoch, wenn die IP regestriert ist, wird der Ping-Request ein 202 zurückschicken.
-Dieser Statuscode sollte benutzt werden um zu gucken, ob der Server das Gerät regestriert hat.
+Der Ping-Request liefert je nach Registrierungsstatus unterschiedliche Codes:
+
+- `200` für nicht registrierte IPs
+- `202` für registrierte IPs
+
+Der Statuscode `202` sollte verwendet werden, um zu prüfen, ob der Server das Gerät bereits registriert hat.

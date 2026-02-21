@@ -32,6 +32,7 @@ RANDOM_ERROR_LIST = [
     ":("
 ]
 
+FILEVER = "0.4-INDEV-PREVIEW"
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 TWOFACODE = None
 
@@ -108,7 +109,8 @@ def sendNotification(title:str, body:str):
             title=title,
             body=body,
             app_id="RePCC",
-            duration="short"
+            duration="short",
+            icon=assetsPath("assets/repcclogo.png")
         )
 
     threading.Thread(target=_).start()
@@ -207,3 +209,45 @@ def getSetting(setting:str):
         return getWebRtcSettings()
     
     raise ValueError("Setting does not exist.")
+
+def sendRandomWakeNotif():
+
+    import random
+    import datetime
+
+    choice = None
+
+    lis = [
+        f"Hello!",
+        f"Hey!",
+        f"Yello!",
+        f"Sup!",
+        f"Hi!",
+        f"Hey there!",
+    ]
+
+    if random.randint(0,2) == 0:
+        hour = datetime.datetime.now().hour
+        print(hour)
+
+        if hour < 6:
+            choice = f"Good (very early) morning!"
+        
+        elif hour < 12:
+            choice = f"Good morning!"
+        
+        elif hour < 17:
+            choice = f"Good afternoon!"
+        
+        elif hour < 22:
+            choice = f"Good evening!"
+        
+        else:
+            choice = f"Hey! Shouldnt you be asleep?"
+    else:
+        choice = lis[random.randint(0, len(lis)-1)]
+
+    print(choice)
+    choice = f"{choice} RePCC-Server version {FILEVER} is now running. If the tray icon is not visible, please report it."
+
+    sendNotification("Startup confirmation", choice) 

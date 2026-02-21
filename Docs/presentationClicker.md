@@ -1,11 +1,11 @@
 # Clicker
 
-So führt man den Clicker aus:
+So wird der Clicker ausgeführt:
 
 `http://IP:15248/macro/presenter/{DIRECTION}`
 
-für die direction kann entweder "forward" (next slide) oder "backward" (previous slide) sein
+Für `{DIRECTION}` kann entweder `forward` (nächste Folie) oder `backward` (vorherige Folie) verwendet werden.
 
-z.B 
+Beispiel:
 
 `http://IP:15248/macro/presenter/forward`

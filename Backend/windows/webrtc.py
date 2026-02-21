@@ -102,24 +102,36 @@ async def offer(request: OfferRequest):
 
         @pc.on("datachannel")
         def on_datachannel(channel):
-            if channel.label == "laser":
+            try:
+                if channel.label == "laser":
 
-                logger.info(f"WebRTC | laser datachannel has been created.")
+                    logger.info(f"WebRTC | laser datachannel has been created.")
 
-                lastupdate = time.time()
+                    lastupdate = [time.time()]  # Use list to allow modification in nested function
 
-                @channel.on("message")
-                async def on_message(message):
-                    try:
-                        currenttime = time.time()
-                        if currenttime - lastupdate >= 1/refreshrate:
-                            currenttime = lastupdate
-                            data = json.loads(message)
-                            pos = LaserPos(x=data["x"], y=data["y"])
-                            await UpdateLaserpointer(pos=pos)
-                    except Exception as e:
-                        logger.error(f"WebRCT | ERROR @ webrct.py/offer/on_datachannel")
-                        logger.error(customerror("WebRTC", e))
+                    @channel.on("message")
+                    async def on_message(message):
+                        try:
+                            currenttime = time.time()
+                            if currenttime - lastupdate[0] >= 1/refreshrate:
+                                lastupdate[0] = currenttime
+                                # Validate message is a string before parsing
+                                if not isinstance(message, str):
+                                    logger.warning(f"WebRTC | Ignoring non-string message: {type(message)}")
+                                    return
+                                data = json.loads(message)
+                                pos = LaserPos(x=data["x"], y=data["y"])
+                                await UpdateLaserpointer(pos=pos)
+                        except json.JSONDecodeError as je:
+                            logger.warning(f"WebRTC | Invalid JSON in laser message: {message}")
+                        except KeyError as ke:
+                            logger.warning(f"WebRTC | Missing key in laser data: {ke}")
+                        except Exception as e:
+                            logger.error(f"WebRTC | ERROR @ webrct.py/offer/on_message")
+                            logger.error(customerror("WebRTC", e))
+            except Exception as e:
+                logger.error(f"WebRTC | ERROR @ webrct.py/offer/on_datachannel")
+                logger.error(customerror("WebRTC", e))
 
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
@@ -156,7 +168,7 @@ async def offer(request: OfferRequest):
 
 def _runWEBRTC():
     logger.info("WebRTC | WebRTC server running.")
-    uvicorn.run(App, host="0.0.0.0", port=15249)
+    uvicorn.run(App, host="0.0.0.0", port=15249, log_config=None, access_log=False)
 
 def startWebRTCServer():
     threading.Thread(target=_runWEBRTC, daemon=True).start()

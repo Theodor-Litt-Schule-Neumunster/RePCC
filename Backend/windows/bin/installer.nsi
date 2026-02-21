@@ -3,12 +3,15 @@
 Name "RePCC"
 OutFile "RePCC-Setup.exe"
 InstallDir "$APPDATA\.RePCC\applications"
-RequestExecutionLevel user
+RequestExecutionLevel admin
+
+!define AUTOSTART_TASK_NAME "RePCC Autostart"
 
 !define BANNER_HEADER "${__FILEDIR__}\banner.bmp"
 !define BANNER_SIDE "${__FILEDIR__}\banner_welcome.bmp"
 
 !define MUI_ICON "${__FILEDIR__}\installicon.ico"
+!define MUI_UNICON "${__FILEDIR__}\uninstall.ico"
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_RIGHT
 !define MUI_HEADERIMAGE_BITMAP "${BANNER_HEADER}"
@@ -54,10 +57,21 @@ Section "Main"
 SectionEnd
 
 Section "Uninstall"
+  ; Close related app processes to avoid file lock issues
+  ExecWait '"$SYSDIR\taskkill.exe" /F /T /IM "main.exe"' $1
+  ExecWait '"$SYSDIR\taskkill.exe" /F /T /IM "openfile.exe"' $1
+
+  ; Remove autostart scheduled task if it exists
+  ExecWait '"$SYSDIR\schtasks.exe" /Delete /TN "${AUTOSTART_TASK_NAME}" /F' $0
+  StrCmp $0 0 +2
+  ; Fallback if task is stored with leading slash in some systems
+  ExecWait '"$SYSDIR\schtasks.exe" /Delete /TN "\${AUTOSTART_TASK_NAME}" /F' $0
+
   Delete "$INSTDIR\main.exe"
   Delete "$INSTDIR\openfile.exe"
   Delete "$INSTDIR\welcome.html"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
+  RMDir /r /REBOOTOK "$APPDATA\.RePCC"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\RePCC"
 SectionEnd

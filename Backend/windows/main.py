@@ -18,6 +18,8 @@ import uvicorn
 import threading
 import subprocess
 import logging.config
+import re
+import xml.etree.ElementTree as ET
 
 # --
 # from's
@@ -35,7 +37,7 @@ from zeroconf import Zeroconf, ServiceInfo
 from webrtc import startWebRTCServer
 from pcmac import initializePCMAC, macro
 from args import (
-    LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath, getSetting,
+    LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath, getSetting, sendRandomWakeNotif,
     sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost
 )
 
@@ -44,6 +46,14 @@ from args import (
 MAC = ':'.join(('%012X' % uuid.getnode())[i:i+2] for i in range(0, 12, 2))
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 TWOFACODE = None
+
+# Redirect stderr to error log file for better debugging
+ERROR_LOG_PATH = ROAMING + "\\.RePCC\\logs\\errors.txt"
+try:
+    os.makedirs(os.path.dirname(ERROR_LOG_PATH), exist_ok=True)
+    sys.stderr = open(ERROR_LOG_PATH, "a", buffering=1)
+except Exception:
+    pass
 
 try:
     logging.config.dictConfig(LOGGER_CONF)
@@ -405,6 +415,163 @@ def registerMDNS(port:int = 15250):
     zc.register_service(serviceinfo)
     return zc, serviceinfo
 
+#   --------------- TASK SCHEDULER AUTOSTART
+
+AUTOSTART_TASK_NAME = "RePCC Autostart"
+
+def _autostart_supported() -> bool:
+    return os.name == "nt" and getattr(sys, "frozen", False)
+
+def _build_autostart_task_action():
+    if not _autostart_supported():
+        raise RuntimeError("Autostart task is only supported for frozen Windows binaries.")
+
+    executable = os.path.abspath(sys.executable)
+    return f'"{executable}"'
+
+def _autostart_task_exists() -> bool:
+    if not _autostart_supported():
+        return False
+
+    result = subprocess.run(
+        ["schtasks", "/Query", "/TN", AUTOSTART_TASK_NAME],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False
+    )
+    return result.returncode == 0
+
+def _autostart_enabled() -> bool:
+    if not _autostart_supported():
+        return False
+
+    result = subprocess.run(
+        ["schtasks", "/Query", "/TN", AUTOSTART_TASK_NAME, "/V", "/FO", "LIST"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False
+    )
+
+    if result.returncode == 0 and result.stdout.strip():
+        state_match = re.search(
+            r"^\s*Scheduled Task State\s*:\s*(.+?)\s*$",
+            result.stdout,
+            re.IGNORECASE | re.MULTILINE
+        )
+        if state_match:
+            state_value = state_match.group(1).strip().lower()
+            if state_value == "enabled":
+                return True
+            if state_value == "disabled":
+                return False
+
+        status_match = re.search(
+            r"^\s*Status\s*:\s*(.+?)\s*$",
+            result.stdout,
+            re.IGNORECASE | re.MULTILINE
+        )
+        if status_match:
+            status_value = status_match.group(1).strip().lower()
+            if status_value in {"ready", "running", "queued"}:
+                return True
+
+    xml_query = subprocess.run(
+        ["schtasks", "/Query", "/TN", AUTOSTART_TASK_NAME, "/XML"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False
+    )
+
+    if xml_query.returncode == 0 and xml_query.stdout.strip():
+        try:
+            root = ET.fromstring(xml_query.stdout)
+            enabled_node = root.find(".//{*}Settings/{*}Enabled")
+            if enabled_node is None:
+                return True
+            if enabled_node.text is not None:
+                return enabled_node.text.strip().lower() == "true"
+        except ET.ParseError as e:
+            logger.error(customerror("main", f"Failed to parse startup task XML. {e}"))
+
+    logger.error(customerror("main", "Could not determine startup task state from task query output."))
+    return False
+
+def _create_autostart_task() -> bool:
+    if not _autostart_supported():
+        logger.info("main | Startup task creation skipped (script/debug mode).")
+        return False
+
+    run_action = _build_autostart_task_action()
+
+    result = subprocess.run(
+        [
+            "schtasks", "/Create",
+            "/TN", AUTOSTART_TASK_NAME,
+            "/SC", "ONLOGON",
+            "/TR", run_action,
+            "/RL", "HIGHEST",
+            "/F"
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False
+    )
+
+    if result.returncode == 0:
+        logger.info(f"main | Created startup task: {AUTOSTART_TASK_NAME}")
+        return True
+
+    logger.error(
+        customerror(
+            "main",
+            f"Failed to create startup task. stdout={result.stdout.strip()} stderr={result.stderr.strip()}"
+        )
+    )
+    return False
+
+def _set_autostart_enabled(enable: bool) -> bool:
+    if not _autostart_supported():
+        logger.info("main | Startup task toggle skipped (script/debug mode).")
+        return False
+
+    command = "ENABLE" if enable else "DISABLE"
+    result = subprocess.run(
+        ["schtasks", "/Change", "/TN", AUTOSTART_TASK_NAME, f"/{command}"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False
+    )
+
+    if result.returncode == 0:
+        logger.info(f"main | Startup task state changed to {command}")
+        return True
+
+    logger.error(customerror("main", f"Failed to set startup task to {command}. {result.stderr.strip()}"))
+    return False
+
+def autostartInit():
+    if not _autostart_supported():
+        logger.info("main | Startup task init skipped (script/debug mode).")
+        return
+
+    logger.info("main | Initializing startup task...")
+    if _autostart_task_exists():
+        logger.info("main | Startup task already exists.")
+        return
+
+    if _create_autostart_task():
+        sendNotification("RePCC Startup", "Start-on-boot task was enabled.")
+
 #   --------------- MENU TRAY
 
 def tray_main():
@@ -425,22 +592,77 @@ def tray_main():
 
 
     try:
-        def testbool(icon, item):
-            testbool.enabled = not testbool.enabled # type: ignore
-            print("Event")
-            print(icon, item)
-            print()
+        def exit_app(icon, item):
+            logger.info("main | Tray exit requested.")
+            try:
+                if MDNS and SERVICEINFO:
+                    MDNS.unregister_service(SERVICEINFO)
+                    MDNS.close()
+            except Exception as e:
+                logger.error(customerror("main", f"mDNS shutdown failed: {e}"))
 
-        testbool.enabled = False # type: ignore
+            icon.stop()
+            os._exit(0)
+
+        def toggle_autostart(icon, item):
+            if not _autostart_supported():
+                sendNotification("RePCC Startup", "Start-on-boot is only available in the built binary.")
+                return
+
+            enabled_now = _autostart_enabled()
+
+            if not _autostart_task_exists():
+                if not _create_autostart_task():
+                    sendNotification("RePCC Startup", "Failed to enable start-on-boot.")
+                    return
+                enabled_now = True
+
+            target_state = not enabled_now
+            if _set_autostart_enabled(target_state):
+                status = "enabled" if target_state else "disabled"
+                sendNotification("RePCC Startup", f"Start-on-boot {status}.")
+                logger.info(f"main | Start-on-boot {status} from tray menu.")
+            else:
+                sendNotification("RePCC Startup", "Could not change start-on-boot state.")
 
         tray_menu = pystray.Menu(
-            pystray.MenuItem("BoolTest", testbool, checked=lambda item: testbool.enabled), # type: ignore
+            pystray.MenuItem(
+                "Start on boot",
+                toggle_autostart,
+                checked=lambda item: _autostart_enabled(),
+                enabled=lambda item: _autostart_supported()
+            ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Exit", exit_app)
         )
 
-        image = Image.open(assetsPath("assets/repcclogo.ico"))
+        # Load tray icon with fallback
+        image = None
+        icon_paths = [
+            assetsPath("assets/repcclogo.ico"),
+            os.path.join(ROAMING, ".RePCC", "applications", "assets", "repcclogo.ico"),
+            os.path.join(os.path.dirname(sys.executable), "assets", "repcclogo.ico") if getattr(sys, "frozen", False) else None
+        ]
+        
+        for icon_path in icon_paths:
+            if icon_path and os.path.exists(icon_path):
+                try:
+                    image = Image.open(icon_path)
+                    logger.info(f"main | Loaded tray icon from {icon_path}")
+                    break
+                except Exception as e:
+                    logger.warning(customerror("main", f"Failed to load icon from {icon_path}: {e}"))
+        
+        if image is None:
+            logger.warning(customerror("main", "No tray icon found, creating placeholder"))
+            image = Image.new("RGB", (64, 64), color=(73, 109, 137))
+        
         icon = pystray.Icon("repcc", image, "RePCC", tray_menu)
         icon.run()
     except Exception as e:
+        import traceback
+        error_msg = f"Tray initialization failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+        logger.error(customerror("main", error_msg))
         print(e)
 
 #   --------------- STARTUP FUNCTIONS  
@@ -460,9 +682,9 @@ def wipeSavedIPs():
 def firewallInit():
 
     # RePCC Ports:
-    # - 15247 Presentation Port
     # - 15248 Default Port
     # - 15249 WerRTC Port
+    # - 15250 WerRTC Port
 
     logger.info("main | Checking firewall rules...")
 
@@ -471,6 +693,8 @@ def firewallInit():
             ["netsh", "advfirewall", "firewall", "show", "rule", f"name={rule_name}"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False
         )
         out = (result.stdout or "").lower()
@@ -479,6 +703,7 @@ def firewallInit():
     rules = [
         (".RePCC 15248 In", "TCP", 15248),
         (".RePCC 15249 In", "TCP", 15249),
+        (".RePCC 15250 In", "TCP", 15250)
     ]
 
     for name, protocol, port in rules:
@@ -498,6 +723,8 @@ def firewallInit():
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False
         )
 
@@ -511,9 +738,6 @@ def firewallInit():
 # TODO:
 # - YAML DEBUG: Integrage verbose level for notifications and debug bool idk
 # - Finish Tray icon integration
-# - Start settings requests
-# - Fix trail from laserpointer not disappearing when let go
-# - Add variable trail length in settings
 
 def MAIN():
 
@@ -554,7 +778,10 @@ def MAIN():
     logger.info("\n\n--------------------START--------------------")
     logger.info("Wakey wakey eggs 'n bakey! Time to run!")
 
-    run_as_admin()
+    if not getattr(sys, "frozen", False):
+        run_as_admin()
+    else:
+        logger.info("main | Frozen build detected; skipping run_as_admin().")
 
     logger.info("main | Initializing .pcmac")
     initializePCMAC()
@@ -563,6 +790,7 @@ def MAIN():
     logger.info("main | Running initial functions at startup...")
     wipeSavedIPs()
     requestsInit()
+    autostartInit()
     firewallInit()
 
     logger.info("main | Initializing mDNS")
@@ -576,7 +804,8 @@ def MAIN():
 
     if os.name == "nt":
         logger.info(f"main | Request server started.")
-        uvicorn.run(App, host="0.0.0.0", port=15248)
+        sendRandomWakeNotif()
+        uvicorn.run(App, host="0.0.0.0", port=15248, log_config=None, access_log=False)
         logger.info("\n---------------------END---------------------\n") # Not guaranteed to be in log
     else:
         logger.error(f"main | App started on an operating system that is not NTFS.")

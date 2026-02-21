@@ -1,48 +1,56 @@
 # WebRTC & Laserpointer
 
-### Setup der Refreshrate
+## Setup der Refreshrate
 
-Ein wichtiger Punkt vom Laserpointer ist die Refreshrate, welche sagt, wie schnell die Laserpointer Updates geschickt werden.
-Diese sind auf den PC gespeichert, und muss per HTTP request vom client gefragt werden, um selber einen Ratelimit einstellen zu können.
+Ein wichtiger Punkt beim Laserpointer ist die Refreshrate. Sie legt fest, wie schnell Laserpointer-Updates gesendet werden.
+
+Die Refreshrate ist auf dem PC gespeichert und muss vom Client per HTTP-Request abgefragt werden, damit der Client sein eigenes Ratelimit korrekt setzen kann.
 
 ---
-WICHTIG - Der Server hat selber einen Ratelimit für die Updates eingebaut. JEDOCH muss der Client auch eins haben. Auch wenn der Server rausfiltert, welche Daten veratbeitet werden, wird ein massiver Stream an Daten den Datentunnel extrem verlangsamen.
 
-"Wie bekomme ich das hin?"
+**Wichtig:** Der Server hat bereits ein Ratelimit für Updates eingebaut. Trotzdem muss auch der Client ein eigenes Ratelimit haben. Zwar filtert der Server zu viele Daten heraus, aber ein massiver Datenstrom kann den Datentunnel trotzdem stark verlangsamen.
 
-Ganz einfach. Durch die Request bekommt man ein refreshrate als INT (z. b. 30). Stell einfach sicher, dass die Requests in diesem Rate geschickt wird.
+Wie setzt man das um?
+
+Die Anfrage liefert eine Refreshrate als `int` (z. B. `30`). Stelle sicher, dass Updates nur in dieser Rate gesendet werden.
 
 ```py
-if currenttime - lastupdate >= 1/refreshrate: 
-    ... # SEND POS DATA INTO DATATUNNEL
+if currenttime - lastupdate >= 1 / refreshrate:
+    ...  # SEND POS DATA INTO DATATUNNEL
 ```
-Das ist ein einfacher beispiel, wie man so ein Ratelimit in PY einbauen kann.
 
-- lastupdate = zeit des letzen updates, mit MS
-- currenttime = jetzige zeit vom versuch, mit MS
+Das ist ein einfaches Beispiel für ein Ratelimit in Python.
+
+- `lastupdate` = Zeit des letzten Updates (in ms)
+- `currenttime` = aktuelle Zeit des Sendeversuchs (in ms)
 
 ---
 
-### DataChannels und Updates
+## DataChannels und Updates
 
-Der Server erstellt von selbst ein video DataChannel, dieser ist auch passend "video" genannt.
-Um Bildschirmdaten vom PC zu bekommen, musst du eine PeerConnection erstellen, einen Transceiver hinzufügen (name "video", direction, "recvonly" (Recievie only))
-Dadurch werden dann die Bildschirmdaten durch einen Stream geschickt.
+Der Server erstellt automatisch einen Video-DataChannel mit dem Namen `video`.
 
-Für den Laserpointer, musst der Flutter-Client selbst den DataChannel "laser" erstellen.
-Dadurch werden dann normalisierte Werde (0.0 - 1.0) geschickt. Das ist die Position des Tippens / Drag ist.
+Um Bildschirmdaten vom PC zu empfangen, muss die App eine PeerConnection erstellen und einen Transceiver mit `name: "video"` und `direction: "recvonly"` hinzufügen.
 
-Die geschickten Daten werden in einen JSON format erwartet. Ungefair so:
+Dadurch werden die Bildschirmdaten über einen Stream übertragen.
+
+Für den Laserpointer muss der Flutter-Client selbst den DataChannel `laser` erstellen.
+
+Über diesen Kanal werden normalisierte Werte (`0.0` bis `1.0`) gesendet. Diese Werte entsprechen der Position beim Tippen bzw. Draggen.
+
+Die gesendeten Daten werden im JSON-Format erwartet, zum Beispiel:
+
 ```json
 {
-    "x":0.1512412547,
-    "y":0.5753252109
+  "x": 0.1512412547,
+  "y": 0.5753252109
 }
 ```
 
-Der Server übernimmt den Rest.
+Den Rest übernimmt der Server.
 
-# WICHTIG!
+## Wichtig beim Trennen der Verbindung
 
-Wenn die verbindung geschlossen wird, durch App-Schließen u. s. w, dann muss ein disconnect zum WebRTC server geschickt werden, durch den DC.
-Wenn es nicht gemacht wird, besteht die Chance, dass ein Laserpointer gestartet wird, und durch den Alten WebRTC datatunnel im mitten vom benutzen, wieder geschlossen.
+Wenn die Verbindung geschlossen wird (z. B. durch App-Schließen), muss über den DataChannel ein Disconnect an den WebRTC-Server gesendet werden.
+
+Wenn das nicht passiert, kann es vorkommen, dass ein neuer Laserpointer gestartet wird und der alte WebRTC-Datentunnel während der Nutzung unerwartet geschlossen wird.
