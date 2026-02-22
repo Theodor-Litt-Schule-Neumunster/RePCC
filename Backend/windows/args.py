@@ -32,7 +32,7 @@ RANDOM_ERROR_LIST = [
     ":("
 ]
 
-FILEVER = "0.4-INDEV-PREVIEW"
+FILEVER = "0.41-INDEV-PREVIEW"
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 TWOFACODE = None
 

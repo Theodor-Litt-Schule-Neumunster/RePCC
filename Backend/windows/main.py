@@ -1,5 +1,5 @@
 
-# pyinstaller --onefile --noconsole --manifest base/manifest.manifest --add-data "assets;assets" --icon="./assets/repccBin.ico" main.py
+# pyinstaller --noconfirm --onefile --noconsole --manifest base/manifest.manifest --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
 
 # Debugger notes: Please run VSC as Administrator to debug this within VSC. ( Or any IDE you're using )
 
@@ -750,6 +750,8 @@ def firewallInit():
 # - Finish Tray icon integration
 
 def MAIN():
+
+    global MDNS, SERVICEINFO
 
     def is_admin():
         try:
