@@ -677,8 +677,6 @@ def tray_main():
 
 def wipeSavedIPs():
 
-    # NOTE: FIX ERROR WHEN STARTING / FILE MISSING.
-
     logger.info("main | removing saved IPs from previous session...")
 
     register = getRegistryYaml()

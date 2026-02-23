@@ -2,7 +2,7 @@
 
 Name "RePCC"
 OutFile "RePCC-Setup.exe"
-InstallDir "$APPDATA\.RePCC\applications"
+InstallDir "$PROGRAMFILES64\RePCC"
 RequestExecutionLevel admin
 
 !define AUTOSTART_TASK_NAME "RePCC Autostart"

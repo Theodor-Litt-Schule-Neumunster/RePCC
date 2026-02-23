@@ -120,8 +120,12 @@ async def offer(request: OfferRequest):
                                     logger.warning(f"WebRTC | Ignoring non-string message: {type(message)}")
                                     return
                                 data = json.loads(message)
-                                pos = LaserPos(x=data["x"], y=data["y"])
-                                await UpdateLaserpointer(pos=pos)
+                                x, y = data.get("x", None), data.get("y", None)
+
+                                if not x == None and not y == None:
+                                    pos = LaserPos(x=data["x"], y=data["y"])
+                                    await UpdateLaserpointer(pos=pos)
+
                         except json.JSONDecodeError as je:
                             logger.warning(f"WebRTC | Invalid JSON in laser message: {message}")
                         except KeyError as ke:
