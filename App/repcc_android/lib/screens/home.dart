@@ -273,7 +273,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       MaterialPageRoute(builder: (context) => const MacroScreen()),
                     );
                   },
-                  icon: const Icon(Icons.keyboard, color: Colors.black),
+                  icon: SvgPicture.asset(
+                    'assets/Icons/keyboard.svg',
+                    colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                    width: 24,
+                    height: 24,
+                  ),
                   label: const Text('Macros'),
                 ),
               ),
