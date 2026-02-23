@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/macro.dart';
 import '../models/macro_store.dart';
 
@@ -155,7 +156,12 @@ class _MacroScreenState extends State<MacroScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _upsertMacro(),
-        icon: const Icon(Icons.add),
+        icon: SvgPicture.asset(
+          'assets/Icons/add.svg',
+          colorFilter: ColorFilter.mode(colorScheme.onPrimary, BlendMode.srcIn),
+          width: 24,
+          height: 24,
+        ),
         label: const Text('Add Macro'),
       ),
       body: _loading
@@ -194,8 +200,13 @@ class _MacroScreenState extends State<MacroScreen> {
                         onTap: () => _upsertMacro(existing: macro),
                         trailing: IconButton(
                           onPressed: () => _deleteMacro(macro),
-                          icon: Icon(Icons.delete_outline,
-                              color: colorScheme.onTertiary.withOpacity(0.7)),
+                          icon: SvgPicture.asset(
+                            'assets/Icons/delete.svg',
+                            colorFilter: ColorFilter.mode(
+                                colorScheme.onTertiary.withOpacity(0.7), BlendMode.srcIn),
+                            width: 22,
+                            height: 22,
+                          ),
                         ),
                       ),
                     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/device.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 import 'dart:async';
@@ -247,7 +248,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
                     )
-                  : Icon(Icons.search),
+                  : SvgPicture.asset(
+                      'assets/Icons/search.svg',
+                      colorFilter: ColorFilter.mode(colorScheme.onPrimary, BlendMode.srcIn),
+                      width: 20,
+                      height: 20,
+                    ),
               label: Text(_isScanning ? 'Scanning...' : 'Scan for Devices', style: TextStyle(fontFamily: 'JetBrainsMono')),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
@@ -281,7 +287,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                         return Card(
                           color: colorScheme.tertiary,
                           child: ListTile(
-                            leading: Icon(Icons.computer, color: colorScheme.onTertiary),
+                            leading: SvgPicture.asset(
+                              'assets/Icons/computer.svg',
+                              colorFilter:
+                                  ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+                              width: 24,
+                              height: 24,
+                            ),
                             title: Text(
                               device.name,
                               style: TextStyle(color: colorScheme.onTertiary, fontFamily: 'JetBrainsMono'),
@@ -294,7 +306,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                 Text('Ports: ${device.ports.join(", ")}', style: TextStyle(color: colorScheme.onTertiary.withOpacity(0.7), fontSize: 12)),
                               ],
                             ),
-                            trailing: Icon(Icons.arrow_forward_ios, color: colorScheme.onTertiary.withOpacity(0.7), size: 16),
+                            trailing: SvgPicture.asset(
+                              'assets/Icons/arrow_forward.svg',
+                              colorFilter: ColorFilter.mode(
+                                  colorScheme.onTertiary.withOpacity(0.7), BlendMode.srcIn),
+                              width: 16,
+                              height: 16,
+                            ),
                             onTap: () => _selectDevice(device),
                           ),
                         );

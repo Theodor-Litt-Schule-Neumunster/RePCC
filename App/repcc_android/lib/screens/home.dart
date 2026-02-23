@@ -90,7 +90,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   Align(
                     alignment: Alignment.topRight,
                     child: IconButton(
-                      icon: Icon(Icons.close, color: colorScheme.onTertiary),
+                      icon: SvgPicture.asset(
+                        'assets/Icons/close.svg',
+                        colorFilter:
+                            ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+                        width: 24,
+                        height: 24,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
@@ -156,17 +162,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: colorScheme.onTertiary,
                     ),
                   )
-                : Icon(
-                    Icons.sync,
-                    color: colorScheme.onTertiary,
+                : SvgPicture.asset(
+                    'assets/Icons/sync.svg',
+                    colorFilter:
+                        ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+                    width: 24,
+                    height: 24,
                   ),
             tooltip: 'Refresh Status',
             onPressed: _isRefreshingStatus ? null : _refreshAllDeviceStatuses,
           ),
           IconButton(
-            icon: Icon(
-              isGridStyle ? Icons.view_agenda : Icons.grid_view,
-              color: colorScheme.onTertiary,
+            icon: SvgPicture.asset(
+              isGridStyle ? 'assets/Icons/list.svg' : 'assets/Icons/grid.svg',
+              colorFilter: ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+              width: 24,
+              height: 24,
             ),
             tooltip: isGridStyle ? 'Einfache Liste' : 'Kachelansicht',
             onPressed: () {
