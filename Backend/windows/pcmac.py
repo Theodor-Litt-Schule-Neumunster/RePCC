@@ -1,9 +1,9 @@
 #filever : 0.2 indev
 
-#pyinstaller cmdlet: pyinstaller --onefile --add-data "assets;assets" --collect-all pyfiglet --icon="./assets/repccBin.ico" pcmac.py
+# pyinstaller cmdlet: pyinstaller --onefile --add-data "assets;assets" --icon="./assets/repccBin.ico" pcmac.py
+# py -3 -m PyInstaller --onefile --add-data "assets;assets" --icon="./assets/repccBin.ico" pcmac.py
 
 import os
-import sys
 import json
 import time
 import shutil
@@ -12,11 +12,15 @@ import winreg
 import logging
 import win32api
 import win32con
+import threading
 import subprocess
 import logging.config
 
-from pynput.keyboard import Controller, Key
-from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath
+from pynput.keyboard import Controller, Key, Listener, KeyCode
+from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath, sendNotification
+
+# Windows process creation flag to hide console windows
+CREATE_NO_WINDOW = 0x08000000
 
 try:
     logging.config.dictConfig(LOGGER_CONF)
@@ -24,11 +28,11 @@ try:
 except:
     logger = forceLogFolder()
 
-APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
+APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
 
-FILEVER = "0.19"
+FILEVER = "0.195"
 SPECIAL_KEY_MAP = {
     'ctrl': Key.ctrl,
     'shift': Key.shift,
@@ -92,13 +96,42 @@ class macro():
     def __init__(self) -> None:
         pass
 
-    def verifyStructure(self, jsonFilePath:str, v:bool=False) -> bool:
+        self.kill = False
+        self.listener = None
+
+    def wait(self, time_ms:int|float):
+        
+        for _ in range(int(time_ms)):
+            if self.kill:
+                break
+
+            time.sleep(1/1000)
+
+    def _keybindListener(self):
+
+        sendNotification("Macro help", "Press CONTROL and K at the same time to stop the macro.")
+
+        def press(key):
+            if str(key) == "'\\x0b'": # CTRL + K  
+                print("Combo")
+                logger.info("Keycombo pressed, killing macro.")
+                self.kill = True
+
+        self.listener = Listener(on_press=press)
+        with self.listener:
+            self.listener.join()
+
+    def startKeyListener(self):
+        self.listenerThread = threading.Thread(target=self._keybindListener, daemon=True)
+        self.listenerThread.start()
+
+    def verifyStructure(self, jsonFilePathOrJSONdata:str|dict) -> bool:
         """
         Verifies the structure for a macro.\n
         Essential to check if it will cause issues when running.
         
-        :param jsonFilePath: the filepath to the JSON file.
-        :type jsonFilePath: str
+        :param jsonFilePathOrJSONdata: the filepath to the JSON file or JSON data.
+        :type jsonFilePathOrJSONdata: str | dict
         :param v: makes the function verbose if set to True. Default is False
         :type v: bool
         :return: Returns True if the stucture is valid for macros, false if not.
@@ -108,18 +141,28 @@ class macro():
         # refer to ./bases/structure.json to see macro structure.
 
         data = None
+        datatype = "PATH"
+
+        if not os.path.exists(str(jsonFilePathOrJSONdata)): # type: ignore
+            datatype = "JSON"
 
         try:
-            logger.info("pcmac | Atempting to open file to verify the structure...")
-            with open(jsonFilePath, "r") as f:
+            if datatype == "PATH":
+                logger.info("pcmac | Atempting to open file to verify the structure...")
+                with open(jsonFilePathOrJSONdata, "r") as f: # type: ignore
 
-                data = json.load(f)
-                f.close()
+                    data = json.load(f)
+                    f.close()
 
-            logger.info("pcmac | Opened file successfully.")
+                logger.info("pcmac | Opened file successfully.")
+            
+            if datatype == "JSON":
+                data = jsonFilePathOrJSONdata # type: ignore
+                logger.info("pcmac | Recieved JSON to check")
 
         except Exception as e:
-            logger.error(f"pcmac | File open failed. {e}")
+            logger.error("pcmac | ERROR @ pcmac.py/macro/verifyStructure")
+            logger.error(customerror("pcmac", e))
 
             return False
         
@@ -228,7 +271,7 @@ Sleep is outside of range.
             try:
                 for key in data:
                     if key == "$data":
-                        logger.debug("pcmac | Key is $data, skipping.")
+                        logger.info("pcmac | Key is $data, skipping.")
                         continue
                     if data[key]["type"] == "keyboard" or (data[key]["type"] == "mouse" and data[key]["actiontype"] == "click"):
                         CHECK_keys(reqKeyboardAndStaticMouse, data[key]["type"], data[key], int(key))
@@ -247,6 +290,7 @@ Sleep is outside of range.
                 return True
                     
             except Exception as e:
+                logger.error("pcmac | ERROR @ pcmac.py/macro/verifyStructure")
                 logger.error(customerror("pcmac", e))
                 if e.__class__ == KeyError:
                     logger.error("pcmac | -> File does not contain essential keys. Might not be macro format.")
@@ -258,6 +302,20 @@ Sleep is outside of range.
                 return False
 
         return False
+
+    def presenter(self, presenterKey:str):
+
+        def press(key):
+
+            keyboard = Controller()
+            keyboard.press(key)
+            time.sleep(.05)
+            keyboard.release(key)
+
+        key = SPECIAL_KEY_MAP.get(presenterKey, None)
+
+        if not key == None:
+            press(key)
 
     def runMacro(self, MacroName:str):
         """
@@ -271,6 +329,7 @@ Sleep is outside of range.
 
         param_isLoop = None # default if no isloop param is missing
         param_amtLoops = None
+        kill = False
 
         def handler_data(data:dict):
 
@@ -287,7 +346,7 @@ Sleep is outside of range.
                 logger.info(f"pcmac | macro: set amount of loops to {param_amtLoops}")
 
         def handler_mousemove(x_then:float, y_then:float, transitionTimeMS:float, transition:str):
-            logger.debug("pcmac | Macro: Moving mouse.")
+            logger.info("pcmac | Macro: Moving mouse.")
             
             def easing(x:float) -> float:
 
@@ -309,9 +368,8 @@ Sleep is outside of range.
             x_delta = x_abs_then - x_now
             y_delta = y_abs_then - y_now
 
-            transitionTimeSEC = transitionTimeMS / 1000
-            steps = max(int(transitionTimeSEC*60), 1)
-            sleep_time = transitionTimeSEC / steps
+            steps = max(int(transitionTimeMS*60), 1)
+            sleep_time = transitionTimeMS / steps
 
             for i in range(steps + 1):
 
@@ -328,31 +386,41 @@ Sleep is outside of range.
                     x_new = int(x_now + x_delta * transitionProgress)
                     y_new = int(y_now + y_delta * transitionProgress)
 
-                win32api.SetCursorPos((x_new, y_new))
-                if i < steps:
-                    time.sleep(sleep_time+0.005)
+                if not self.kill:
+
+                    win32api.SetCursorPos((x_new, y_new))
+                    if i < steps:
+                        self.wait(sleep_time+0.005)
+                
+                else: 
+                    break
 
         def handler_mouseclick(button:int, pressSleep:int):
 
-            logger.debug(f"pcmac | Macro: Clicking mouse. Button: {button}")
-            logger.debug(f"pcmac | Macro: Press length: " + str(pressSleep/1000) + " seconds.")
-            
-            if button == 0:
-                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0,0)
-                time.sleep(pressSleep/1000+0.001)
-                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0,0)
+            logger.info(f"pcmac | Macro: Clicking mouse. Button: {button}")
+            logger.info(f"pcmac | Macro: Press length: " + str(pressSleep/1000) + " seconds.")
 
-            if button == 1:
-                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0,0)
-                time.sleep(pressSleep/1000+0.001)
-                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0,0)
+            if not self.kill:
+            
+                if button == 0:
+                    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0,0)
+                    self.wait(pressSleep+0.001)
+                    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0,0)
+
+                if button == 1:
+                    win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0,0)
+                    self.wait(pressSleep+0.001)
+                    win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0,0)
+
+            else:
+                return
             
         def handler_keyboard(actiontype:str, keys:list, presssleep:int):
             keyboard = Controller()
 
-            logger.debug(f"pcmac | Macro: Using keyboard. Type: {actiontype}")
-            logger.debug(f"pcmac | Macro: Press length: " + str(presssleep/1000) + " seconds.")
-            logger.debug(f"pcmac | Macro: Appended data: {keys}")
+            logger.info(f"pcmac | Macro: Using keyboard. Type: {actiontype}")
+            logger.info(f"pcmac | Macro: Press ladength: " + str(presssleep) + " seconds.")
+            logger.info(f"pcmac | Macro: Appended data: {keys}")
 
             if actiontype == "singlekey":
 
@@ -365,25 +433,31 @@ Sleep is outside of range.
 
                             key = key.caps_lock
 
-                    keyboard.press(actual_key) # type: ignore[attr-defined]
-                    time.sleep(presssleep/1000+0.002)
-                    keyboard.release(actual_key) # type: ignore[attr-defined]
-            
+                    if not self.kill:
+
+                        keyboard.press(actual_key) # type: ignore[attr-defined]
+                        self.wait(presssleep+0.002)
+                        keyboard.release(actual_key) # type: ignore[attr-defined]
+                    
+                    else:
+                        break
+                
             if actiontype == "multikey":
 
                 actual_keys = []
 
-                for key in keys:
-                    key_lower = key.lower()
-                    actual_key = SPECIAL_KEY_MAP.get(key_lower, key_lower)
-                    actual_keys.append(actual_key)
+                if not self.kill:
+                    for key in keys:
+                        key_lower = key.lower()
+                        actual_key = SPECIAL_KEY_MAP.get(key_lower, key_lower)
+                        actual_keys.append(actual_key)
 
-                    keyboard.press(actual_key) # type: ignore[attr-defined]
+                        keyboard.press(actual_key) # type: ignore[attr-defined]
 
-                time.sleep(presssleep/1000+0.002)
+                    self.wait(presssleep+0.002)
 
-                for key in reversed(actual_keys):
-                    keyboard.release(key)
+                    for key in reversed(actual_keys):
+                        keyboard.release(key)
 
         try:
             macropath = MACDATA + "\\macros\\" + MacroName
@@ -394,19 +468,22 @@ Sleep is outside of range.
             with open(macropath, "r") as f:
                 data = json.load(f)
                 f.close()
+                print(data)
 
             def run():
-                for step in data:
 
+                for step in data:
                     if step == "$data":
-                        logger.debug("pcmac | Macro: Setp is data. Skipping.")
+                        logger.info("pcmac | Macro: Setp is data. Skipping.")
                         continue
 
                     actiondata = data[step]["actiondata"]
                     
-                    logger.debug("pcmac | Macro: Waiting before executing next step...")
-                    logger.debug("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
-                    time.sleep(data[step]["sleep"]/1000+0.001)
+                    logger.info("pcmac | Macro: Waiting before executing next step...")
+                    logger.info("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
+                    self.wait(data[step]["sleep"]+0.001)
+
+                    if self.kill: break
                     
                     if data[step]["type"] == "mouse" and data[step]["actiontype"] == "move":
                         handler_mousemove(actiondata[0], actiondata[1], data[step]["transitiontime"], data[step]["transition"])
@@ -420,40 +497,67 @@ Sleep is outside of range.
                         handler_keyboard(data[step]["actiontype"], actiondata, data[step]["presssleep"])
                         continue
 
+                if self.kill:
+                    sendNotification("Macro status", "Forced macro to shut down with keycombo")
+                    return
+
             if "$data" in data:
-                logger.debug("main | macro: Macro has included data, extracting...")
+                logger.info("main | macro: Macro has included data, extracting...")
                 handler_data(data["$data"])
                 logger.info(f"main | macro: extracted data: { data['$data'] }")
 
+            try:
 
-            print(param_isLoop)
+                if param_isLoop == True:
+                    self.startKeyListener()
+                    while True:
 
-            if param_isLoop == True:
-                while True:
-                    print("call")
+                        if self.kill: 
+                            if self.listener:
+                                self.listener.stop()
+                            if self.listenerThread:
+                                self.listenerThread.join()
+                            break
+
+                        run()
+
+                elif param_amtLoops > 1 and not param_amtLoops == None: # type: ignore[attr-defined]
+                    self.startKeyListener()
+                    for _ in range(int(param_amtLoops)): # type: ignore[attr-defined]
+                        
+                        if self.kill: 
+                            if self.listener:
+                                self.listener.stop()
+                            if self.listenerThread:
+                                self.listenerThread.join()
+                            break
+
+                        run()
+            except Exception:
+                if not Exception.__class__ == KeyboardInterrupt:
+
+                    print("error, so single")
+
+                    self.startKeyListener()
                     run()
 
-            elif param_amtLoops > 1: # type: ignore[attr-defined]
-                for i in range(param_amtLoops): # type: ignore[attr-defined]
-                    print("amt call")
-                    print(i+1)
-                    run()
-
-            else:
-                print("singleloop")
-                run()
+            if self.kill: self.kill = False
+            return
 
         except Exception as e:
+            logger.error("pcmac | ERROR @ pcmac.py/macro/runMacro")
             logger.error(customerror("pcmac", e))
 
-def initializePCMAC(v:bool=False):
+def initializePCMAC():
 
     filestructure = {
         ".RePCC": [
             "macros",
             "settings",
             "assets",
-            "logs"
+            "logs",
+            "data",
+            "applications"
         ],
     }
     def fileVerification():
@@ -461,25 +565,28 @@ def initializePCMAC(v:bool=False):
         for key in filestructure:
             if not os.path.exists(APPDATA+"\\"+key):
                 os.mkdir(APPDATA+"\\"+key)
-                logger.debug(f"pcmac | verif: Created folder {key}")
+                logger.info(f"pcmac | verif: Created folder {key}")
             if (type(filestructure[key]) == dict or type(filestructure[key]) == list) and len(filestructure[key]) > 0:
                 for subkey in filestructure[key]:
                     dir = APPDATA+"\\"+key+"\\"+subkey
                     
                     if not os.path.exists(dir):
                         os.mkdir(dir)
-                        logger.debug(f"pcmac | verif: Created subfolder {subkey} for {key}")
+                        logger.info(f"pcmac | verif: Created subfolder {subkey} for {key}")
                         if subkey == "assets":
                             shutil.copyfile(assetsPath("assets/repcclogo.ico"), MACDATA+"\\assets\\repcc.ico")
                             shutil.copyfile(assetsPath("assets/scriptlogo.ico"), MACDATA+"\\assets\\script.ico")
-                            logger.debug(f"pcmac | verif: Assets cloned into assets")
+                            logger.info(f"pcmac | verif: Assets cloned into assets")
+                        if subkey == "data": 
+                            filedir = assetsPath("assets/_data/register.yaml")
+                            shutil.copyfile(filedir, MACDATA+"\\data\\register.yaml")
 
                     if os.path.exists(MACDATA+"\\settings\\"):
                         defaultsettingdir = assetsPath("assets/_settings/")
                         usersettigdir = MACDATA+"\\settings\\"
 
                         if not len(os.listdir(defaultsettingdir)) == len(os.listdir(usersettigdir)):
-                            logger.debug(f"pcmac | verif: Settings length missmatch")
+                            logger.info(f"pcmac | verif: Settings length missmatch")
 
                             for file in os.listdir(defaultsettingdir):
                                 filedir = assetsPath("assets/_settings/"+file)
@@ -487,12 +594,12 @@ def initializePCMAC(v:bool=False):
                                 if not file in os.listdir(usersettigdir):
                                     shutil.copyfile(filedir, MACDATA+"\\settings\\"+file)
 
-                            logger.debug(f"pcmac | verif: Settings OK")
+                            logger.info(f"pcmac | verif: Settings OK")
 
         with open(MACDATA+"\\version", "w") as f:
             f.write(FILEVER)
             f.close()
-        logger.debug(f"pcmac | verif: Done.")
+        logger.info(f"pcmac | verif: Done.")
         
     def versionVerification():
         
@@ -503,56 +610,77 @@ def initializePCMAC(v:bool=False):
                 version = f.read()
                 f.close()
             if str(version) == FILEVER:
-                logger.debug("pcmac | Fileversion matches.")
+                logger.info("pcmac | Fileversion matches.")
             else:
-                logger.debug("pcmac | Fileversion does not match. Forcing file verification...")
+                logger.info("pcmac | Fileversion does not match. Forcing file verification...")
                 fileVerification()
         else:
-            logger.debug("pcmac | Fileversion noes not exsist. Forcing file verification...")
+            logger.info("pcmac | Fileversion noes not exsist. Forcing file verification...")
             fileVerification()
     
     def regVerification():
-        logger.debug(f"pcmac | regedit: Attempting.")
+
+        # NOTE: Change in the future to check every key
+        # NOTE: Primary application will be in APPDATA/Roaming/.RePCC/Application
+
+        logger.info(f"pcmac | regedit: Attempting.")
+        registryChanged = False
+
         def restartExplorer():
             try:
-                logger.debug(f"pcmac | regedit: Restarting explorer.exe...")
-                subprocess.run(["taskkill", "/f", "/im", "explorer.exe"])
-                subprocess.run(["explorer.exe"])
-                logger.debug(f"pcmac | regedit: Successfully restarted explorer.")
+                logger.info(f"pcmac | regedit: Restarting explorer.exe...")
+                subprocess.run(["taskkill", "/f", "/im", "explorer.exe"], creationflags=CREATE_NO_WINDOW)
+                subprocess.run(["explorer.exe"], creationflags=CREATE_NO_WINDOW)
+                logger.info(f"pcmac | regedit: Successfully restarted explorer.")
             except Exception as e:
                 logger.error(customerror("pcmac", e))
-        if ctypes.windll.shell32.IsUserAnAdmin():
-            logger.debug(f"pcmac | regedit: Is running with administrative privileges.")
-            def keySearch():
-                try:
-                    key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, ".pcmac")
-                    winreg.CloseKey(key)
-                    return True
-                except FileNotFoundError:
-                    logger.debug(f"pcmac | regedit: Key does not exsist.")
-                    return False
-        
-            if not keySearch():
-                ext_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ".pcmac")
-                winreg.SetValueEx(ext_key, None, 0, winreg.REG_SZ, "RePCC_File")
-                winreg.CloseKey(ext_key)
-                progid_key = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, "RePCC_File")
-                winreg.SetValueEx(progid_key, None, 0, winreg.REG_SZ, "RePCC File")
-                icon_key = winreg.CreateKey(progid_key, "DefaultIcon")
-                winreg.SetValueEx(icon_key, None, 0, winreg.REG_SZ, MACDATA+"\\assets\\script.ico") # Takes ico from roaming repcc
-                winreg.CloseKey(icon_key)
-                winreg.CloseKey(progid_key)
 
-                logger.debug(f"pcmac | regedit: Successfully created all keys.")
-                restartExplorer()
-            else:
-                logger.debug(f"pcmac | regedit: Key exsits.")
+        def ensure_registry_value(root, key_path:str, value_name:str|None, expected_value:str):
+            nonlocal registryChanged
+
+            key = winreg.CreateKey(root, key_path)
+            current_value = None
+
+            try:
+                current_value, _ = winreg.QueryValueEx(key, value_name)
+            except FileNotFoundError:
+                current_value = None
+
+            if current_value != expected_value:
+                winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, expected_value)
+                registryChanged = True
+                logger.info(f"pcmac | regedit: Set value for HKCR\\{key_path} ({'(Default)' if value_name is None else value_name}).")
+
+            winreg.CloseKey(key)
+
+        if ctypes.windll.shell32.IsUserAnAdmin():
+            logger.info(f"pcmac | regedit: Is running with administrative privileges.")
+            try:
+                openfileExe = MACDATA + "\\applications\\openfile.exe"
+                openCommand = f'"{openfileExe}" "%1"'
+
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, ".pcmac", None, "RePCC_File")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File", None, "RePCC File")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\DefaultIcon", None, MACDATA+"\\assets\\script.ico")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\shell", None, "open")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\shell\\open", None, "Open with RePCC")
+                ensure_registry_value(winreg.HKEY_CLASSES_ROOT, "RePCC_File\\shell\\open\\command", None, openCommand)
+
+                if registryChanged:
+                    logger.info(f"pcmac | regedit: Registry keys verified and updated.")
+                    restartExplorer()
+                else:
+                    logger.info(f"pcmac | regedit: All required keys already exist and are correct.")
+
+            except Exception as e:
+                logger.error("pcmac | ERROR @ pcmac.py/initializePCMAC/regVerification")
+                logger.error(customerror("pcmac", e))
         else:
             logger.error(customerror("pcmac", "Script is not running as administrator. Can not complete registry verification."))
 
-        logger.debug(f"pcmac | regedit: Done.")
+        logger.info(f"pcmac | regedit: Done.")
     
-    logger.debug("pcmac | Running verification...")
+    logger.info("pcmac | Running verification...")
     logger.info(f"pcmac | Current filestructure version: {str(FILEVER)}")
 
     versionVerification()
@@ -560,6 +688,3 @@ def initializePCMAC(v:bool=False):
 
 if __name__ == "__main__":
     initializePCMAC()
-    mac=macro()
-    #mac.verifyStructure("./base/structure.json")
-    mac.runMacro("mouseTest.pcmac")

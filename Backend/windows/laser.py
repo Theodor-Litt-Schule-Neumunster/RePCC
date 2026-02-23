@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QPainter, QColor, QGuiApplication, QPaintEvent, QRadialGradient
 from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, pyqtSignal
 
-from args import LOGGER_CONF, customerror, forceLogFolder
+from args import LOGGER_CONF, customerror, forceLogFolder, getPresentationSettings
 
 # this is so cool
 
@@ -51,7 +51,7 @@ class LaserOverlay(QWidget):
 
         # Frameless screen that always stays on top w. transparent bg
 
-        loaded_settings = yaml.safe_load(open(SETTINGS+"presentationTools.yaml"))
+        loaded_settings = getPresentationSettings()
         self.loaded_settings = loaded_settings
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool) # type: ignore[attr-defined]
@@ -73,18 +73,26 @@ class LaserOverlay(QWidget):
         self.dot_x = screen.width() // 2
         self.dot_y = screen.height() // 2
 
-        self.trail = deque(maxlen=20)
+        self.trail = deque(maxlen=loaded_settings["laserpointer"].get("traillength", 20))
+
+        self.trail_fade_interval_ms = 50
+        self.trail_fade_step = 0.06
+
+        self.trail_timer = QTimer(self)
+        self.trail_timer.timeout.connect(self._fade_trail_step)
+        self.trail_timer.start(self.trail_fade_interval_ms)
 
         cc = tuple(loaded_settings["laserpointer"].get("corecolor", [255, 0, 0, 0]))
-        self.coreColor = QColor(cc[0], cc[1], cc[2], cc[3])
+        self.coreColor = QColor(int(cc[0]), int(cc[1]), int(cc[2]), int(cc[3]))
+
+        self.coreSize = loaded_settings["laserpointer"].get("size", 8)
 
         self.positionUpdate.connect(self._updatePosInternal)
 
         # makes the cursor be able to click through the widget
         self.make_click_through()
         self.show()
-
-    
+ 
     def fadeout_reset(self):
 
         time = self.loaded_settings["laserpointer"].get("fadetime", 1000)
@@ -120,6 +128,17 @@ class LaserOverlay(QWidget):
             logger.error("Laser | ERROR @ laser.py/LaserOverlay/make_click_through")
             logger.error(customerror("Laser", e))
     
+    def _fade_trail_step(self) -> None:
+        if not self.trail:
+            return
+        new_trail = deque(maxlen=self.trail.maxlen)
+        for (tx, ty, alpha) in self.trail:
+            alpha = max(0.0, alpha - self.trail_fade_step)
+            if alpha > 0:
+                new_trail.append((tx, ty, alpha))
+        self.trail = new_trail
+        self.repaint()
+
     def paintEvent(self, a0:QPaintEvent) -> None: # type: ignore[attr-defined]
         """
         Draws the red dot.
@@ -132,8 +151,8 @@ class LaserOverlay(QWidget):
         if self.opacity <= 0:
             return
 
-        glowradius = 30
-        coreradius = 8
+        glowradius = self.coreSize * 4
+        coreradius = self.coreSize
 
         style = self.loaded_settings["laserpointer"].get("style", "default")
 
@@ -145,10 +164,16 @@ class LaserOverlay(QWidget):
         if style == "default":
 
             gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
-            gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
-            gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
-            gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
-            gradient.setColorAt(1, self.coreColor)
+            gradient.setColorAt(0, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(150* self.opacity))
+                )
+            gradient.setColorAt(.3, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(100* self.opacity))
+                )
+            gradient.setColorAt(.6, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(50* self.opacity))
+                )
+            gradient.setColorAt(1, QColor(255, 255, 255, 0))
 
             painter.setBrush(gradient)
             painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
@@ -156,38 +181,51 @@ class LaserOverlay(QWidget):
 
             coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
             coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
-            coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
-            coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
+            coregradient.setColorAt(0.5, QColor(
+                self.coreColor.red()//2, self.coreColor.green()//2, self.coreColor.blue()//2, 
+                int(240* self.opacity)))
+            coregradient.setColorAt(1, QColor(
+                self.coreColor.red()//3, self.coreColor.green()//3, self.coreColor.blue()//3, int(200* self.opacity)))
 
             painter.setBrush(coregradient)
             painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
                 coreradius * 2, coreradius * 2)
         
         elif style == "trail":
-            for i, (tx, ty) in enumerate(reversed(list(self.trail))):
+            for i, (tx, ty, alpha) in enumerate(reversed(list(self.trail))):
                 if i == 0:
                     continue
 
-                trail_opacity = max(0, self.opacity * (1 - i / len(self.trail)))
+                trail_opacity = max(0, alpha * (1 - i / len(self.trail)))
                 trail_glowradius = max(0, glowradius * (1 - i / len(self.trail)) * 0.5)
-                
+
                 if trail_opacity <= 0 or trail_glowradius <= 0:
                     continue
 
                 gradient = QRadialGradient(tx, ty, trail_glowradius)
-                gradient.setColorAt(0, QColor(255, 0, 0, int(180 * trail_opacity)))
-                gradient.setColorAt(.3, QColor(255, 50, 0, int(120 * trail_opacity)))
-                gradient.setColorAt(.6, QColor(255, 100, 0, int(60 * trail_opacity)))
-                gradient.setColorAt(1, QColor(255, 0, 0, 0))
+                gradient.setColorAt(0, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(180 * trail_opacity)))
+                gradient.setColorAt(.3, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(120 * trail_opacity)))
+                gradient.setColorAt(.6, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(60 * trail_opacity)))
+                gradient.setColorAt(1, QColor(
+                    self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), 0))
                 painter.setBrush(gradient)
                 painter.drawEllipse(int(tx - trail_glowradius), int(ty - trail_glowradius),
                     int(trail_glowradius * 2), int(trail_glowradius * 2)) 
 
             gradient = QRadialGradient(self.dot_x, self.dot_y, glowradius)
-            gradient.setColorAt(0, QColor(255, 0, 0, int(180* self.opacity)))
-            gradient.setColorAt(.3, QColor(255, 50, 0, int(120* self.opacity)))
-            gradient.setColorAt(.6, QColor(255, 100, 0, int(60* self.opacity)))
-            gradient.setColorAt(1, QColor(255, 0, 0, 0))
+            gradient.setColorAt(0, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(150* self.opacity))
+                )
+            gradient.setColorAt(.3, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(100* self.opacity))
+                )
+            gradient.setColorAt(.6, QColor(
+                self.coreColor.red(), self.coreColor.green(), self.coreColor.blue(), int(50* self.opacity))
+                )
+            gradient.setColorAt(1, QColor(255, 255, 255, 0))
 
             painter.setBrush(gradient)
             painter.drawEllipse(self.dot_x - glowradius, self.dot_y - glowradius,
@@ -195,15 +233,17 @@ class LaserOverlay(QWidget):
 
             coregradient = QRadialGradient(self.dot_x, self.dot_y, coreradius)
             coregradient.setColorAt(0, QColor(255, 255, 255, int(225* self.opacity)))
-            coregradient.setColorAt(0.5, QColor(255, 100, 100, int(240* self.opacity)))
-            coregradient.setColorAt(1, QColor(255, 0, 0, int(200* self.opacity)))
-            
+            coregradient.setColorAt(0.5, QColor(
+                self.coreColor.red()//2, self.coreColor.green()//2, self.coreColor.blue()//2, 
+                int(240* self.opacity)))
+            coregradient.setColorAt(1, QColor(50, 50, 50, int(200* self.opacity)))
+
             painter.setBrush(coregradient)
             painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
                 coreradius * 2, coreradius * 2)
 
         elif style == "simple":
-            painter.setBrush(QColor(255, 0, 0, 255))
+            painter.setBrush(self.coreColor)
             painter.drawEllipse(self.dot_x - coreradius, self.dot_y - coreradius,
                 coreradius * 2, coreradius * 2)
 
@@ -215,7 +255,7 @@ class LaserOverlay(QWidget):
         self.dot_x = int(norm_x * screen.width())
         self.dot_y = int(norm_y * screen.height())
 
-        self.trail.append((self.dot_x, self.dot_y))
+        self.trail.append((self.dot_x, self.dot_y, 1.0))
 
         self.fadeout_reset()
         self.repaint()
@@ -236,7 +276,7 @@ def _qt_loop():
     
     # Create overlay in the Qt thread
     overlay = LaserOverlay()
-    logger.debug("Laser | Overlay started successfully.")
+    logger.info("Laser | Overlay started successfully.")
     overlay_ready.set()  # Signal that overlay is ready
     
     sys.exit(App.exec_())
@@ -250,7 +290,7 @@ async def StartLaserpointer() -> tuple[bool, str]:
     """
     global overlay, overlay_ready
 
-    logger.debug("Laser | Starting overlay...")
+    logger.info("Laser | Starting overlay...")
 
     try:
         if overlay is None:
@@ -263,7 +303,7 @@ async def StartLaserpointer() -> tuple[bool, str]:
                 return (False, "Timeout waiting for overlay to start")
         
         else:
-            logger.debug("Laser | Can only run one overlay at a time.")
+            logger.info("Laser | Can only run one overlay at a time.")
 
         return (True, "Great success!")
     except Exception as e:
@@ -302,7 +342,7 @@ async def ClearLaserpointer() -> tuple[bool, str]:
     """
     global overlay
 
-    logger.debug("Laser | Killed overlay.")
+    logger.info("Laser | Killed overlay.")
 
     try:
         if overlay is not None:

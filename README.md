@@ -1,5 +1,10 @@
 # RePCC
 Remote Personal Computer Control (RePCC)
+
+<p align="center">
+  <img src="./_mdassets/banner.png" alt="RePCC Banner" width="800">
+</p>
+
 ## Ziel des Projekts
 Entwicklung einer benutzerfreundlichen Android-App (mit Flutter) inklusive PC-Client, mit der ein Computer im selben Netzwerk gesteuert werden kann.
 

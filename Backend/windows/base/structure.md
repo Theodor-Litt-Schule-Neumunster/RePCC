@@ -2,9 +2,6 @@ FILE STRUCTURE
 
 Version 1
 
-# HEADS UP!
-This is all brainstorm, this might be changed when intigration begins.
-
 ## Structure
 
 Every step is structured in a JSON, where each step is a designated number. The steps go from lowest (first) to highest (last)
@@ -48,16 +45,3 @@ Mouse takes these values:
     > Function for quadratic = M(t)=2t^2 - t^4 D=[0|1]
 - transitiontime (IF MOVE)
     > How long the mouse should be moved to the final desination in MS
-
-### Type: APPLICATION
-- actiontype
-    > can either be open or close. open tells the script to open an application, close tells it to close.
-- actiondata
-    IF OPEN
-    > You can open an application using a shell command or a absolute path. Examples for shell is taskmgr or notepad.
-    IF CLOSE
-    > You can close applications that were opened within the same macro with its step id. Or you can use the task name to kill it. Be careful though.
-- sleep
-    > this is a int in MS that makes the macro wait that long untill it starts the action
-
-# 

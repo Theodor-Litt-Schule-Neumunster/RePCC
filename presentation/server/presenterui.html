@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RePCC Presenter Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            -webkit-overflow-scrolling: none;
+            overscroll-behavior: none;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        #header {
+            padding: 12px 16px;
+            background: #2d2d2d;
+            border-bottom: 1px solid #404040;
+            flex-shrink: 0;
+        }
+        #controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: nowrap;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 12px;
+            font-size: 15px;
+            background: #3a3a3a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 6px;
+            min-width: 0;
+        }
+        button {
+            padding: 10px 16px;
+            font-size: 15px;
+            cursor: pointer;
+            background: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        button:active {
+            background: #004578;
+        }
+        button.secondary {
+            background: #444;
+        }
+        button.secondary:hover {
+            background: #555;
+        }
+        button.secondary:active {
+            background: #333;
+        }
+        #videoContainer {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        #status.connected {
+            color: #4caf50;
+        }
+        #status.connecting {
+            color: #ff9800;
+        }
+        #status.error {
+            color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div id="controls">
+            <input type="text" id="serverIp" placeholder="Server IP (e.g., 192.168.1.100)">
+            <button onclick="connect()">Connect</button>
+            <button class="secondary" onclick="prevSlide()">Prev</button>
+            <button class="secondary" onclick="nextSlide()">Next</button>
+        </div>
+    </div>
+    
+    <div id="videoContainer">
+        <video autoplay playsinline></video>
+        <div id="status">Disconnected</div>
+    </div>
+
+    <script>
+        let pc = null;
+        let dc = null;
+        let refreshrate = 30;
+        let lastupdate = 0;
+
+        function loadServerIp() {
+            const saved = localStorage.getItem('repcc_server_ip');
+            if (saved) {
+                document.getElementById('serverIp').value = saved;
+            }
+        }
+
+        function saveServerIp() {
+            const ip = document.getElementById('serverIp').value;
+            localStorage.setItem('repcc_server_ip', ip);
+        }
+
+        function getServerIp() {
+            const ip = document.getElementById('serverIp').value.trim();
+            if (!ip) {
+                alert('Please enter server IP');
+                return null;
+            }
+            return ip;
+        }
+
+        function setStatus(text, state = 'disconnected') {
+            const status = document.getElementById('status');
+            status.textContent = text;
+            status.className = state;
+        }
+
+        async function nextSlide() {
+            const ip = getServerIp();
+            if (!ip) return;
+            
+            try {
+                await fetch(`http://${ip}:15247/present/next`);
+            } catch (error) {
+                console.error('Next slide error:', error);
+            }
+        }
+
+        async function prevSlide() {
+            const ip = getServerIp();
+            if (!ip) return;
+            
+            try {
+                await fetch(`http://${ip}:15247/present/prev`);
+            } catch (error) {
+                console.error('Prev slide error:', error);
+            }
+        }
+
+        async function connect() {
+            const ip = getServerIp();
+            if (!ip) return;
+            
+            saveServerIp();
+            const webrtcUrl = `http://${ip}:15249`;
+            
+            try {
+                setStatus('Connecting...', 'connecting');
+                
+                const r = await fetch(webrtcUrl + '/refreshrate');
+                const d = await r.json();
+                refreshrate = d[0];
+                console.log("FPS: " + refreshrate);
+                
+                pc = new RTCPeerConnection();
+
+                dc = pc.createDataChannel("laser");
+                dc.onopen = () => console.log("Laser channel open");
+                dc.onclose = () => console.log("Laser channel closed");
+
+                pc.addTransceiver('video', { direction: 'recvonly' });
+
+                pc.ontrack = (event) => {
+                    console.log('Received track:', event.track.kind);
+                    document.querySelector('video').srcObject = event.streams[0];
+                };
+
+                pc.onconnectionstatechange = () => {
+                    console.log('Connection state:', pc.connectionState);
+                    if (pc.connectionState === 'connected') {
+                        setStatus('Connected', 'connected');
+                    } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+                        setStatus('Disconnected', 'error');
+                    }
+                };
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                const response = await fetch(webrtcUrl + '/offer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        sdp: offer.sdp,
+                        type: offer.type
+                    })
+                });
+
+                const answer = await response.json();
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: "answer",
+                    sdp: answer.sdp
+                }));
+                
+            } catch (error) {
+                setStatus('Error: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadServerIp();
+            
+            const videoArea = document.querySelector("video");
+
+            document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+            videoArea.addEventListener("mousedown", (MD_ev) => {
+                function mouseUpEvent(ev) {
+                    videoArea.removeEventListener("mousemove", mouseMoveEvent);
+                    document.removeEventListener("mouseup", mouseUpEvent);
+                }
+
+                function mouseMoveEvent(ev) {
+                    if (dc && dc.readyState === "open") {
+                        const now = performance.now();
+
+                        if (now - lastupdate >= 1000/refreshrate) {
+                            lastupdate = now;
+                            const rect = videoArea.getBoundingClientRect();
+                            const x = (ev.clientX - rect.left) / rect.width;
+                            const y = (ev.clientY - rect.top) / rect.height;
+                            dc.send(JSON.stringify({x:x, y:y}));
+                        }
+                    }
+                }
+                mouseMoveEvent(MD_ev);
+
+                videoArea.addEventListener("mousemove", mouseMoveEvent);
+                document.addEventListener("mouseup", mouseUpEvent);
+            });
+
+            videoArea.addEventListener("touchstart", (TS_ev) => {
+                TS_ev.preventDefault();
+
+                function touchEndEvent(ev) {
+                    videoArea.removeEventListener("touchmove", touchMoveEvent);
+                    document.removeEventListener("touchend", touchEndEvent);
+                    document.removeEventListener("touchcancel", touchEndEvent);
+                }
+
+                function touchMoveEvent(ev) {
+                    ev.preventDefault();
+                    if (dc && dc.readyState === "open") {
+                        const now = performance.now();
+
+                        if (now - lastupdate >= 1000/refreshrate) {
+                            lastupdate = now;
+                            const touch = ev.touches[0];
+                            const rect = videoArea.getBoundingClientRect();
+                            const x = (touch.clientX - rect.left) / rect.width;
+                            const y = (touch.clientY - rect.top) / rect.height;
+                            dc.send(JSON.stringify({x:x, y:y}));
+                        }
+                    }
+                }
+
+                if (TS_ev.touches.length > 0) {
+                    const touch = TS_ev.touches[0];
+                    const rect = videoArea.getBoundingClientRect();
+                    const x = (touch.clientX - rect.left) / rect.width;
+                    const y = (touch.clientY - rect.top) / rect.height;
+                    if (dc && dc.readyState === "open") {
+                        dc.send(JSON.stringify({x:x, y:y}));
+                    }
+                }
+
+                videoArea.addEventListener("touchmove", touchMoveEvent, { passive: false });
+                document.addEventListener("touchend", touchEndEvent);
+                document.addEventListener("touchcancel", touchEndEvent);
+            }, { passive: false });
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (dc && dc.readyState === 'open') {
+                dc.send(JSON.stringify({type: 'disconnect'}));
+            }
+        });
+    </script>
+</body>
+</html>

@@ -2,9 +2,13 @@
 
 import os
 import sys
-import logging
+import yaml
 import random
+import logging
+import threading
 import logging.config
+
+from win11toast import toast
 
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
 RANDOM_ERROR_LIST = [
@@ -28,7 +32,8 @@ RANDOM_ERROR_LIST = [
     ":("
 ]
 
-ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore[attr-defined]
+FILEVER = "0.41-INDEV-PREVIEW"
+ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 TWOFACODE = None
 
 LOGGER_CONF = {
@@ -49,7 +54,7 @@ LOGGER_CONF = {
         },
         "fileHandler": {
             "class": "logging.handlers.RotatingFileHandler",
-            "level": "WARNING",
+            "level": "INFO",
             "formatter": "simpleFormatter",
             "filename": str(ROAMING+"\\.RePCC\\logs\\repcc.log"),
             "mode": "a",
@@ -59,13 +64,13 @@ LOGGER_CONF = {
     },
     "loggers": {
         "RePCC": {
-            "level": "DEBUG",
+            "level": "INFO",
             "handlers": ["fileHandler"],
             "propagate": False
         }
     },
     "root": {
-        "level": "DEBUG",
+        "level": "INFO",
         "handlers": ["consoleHandler", "fileHandler"]
     }
 }
@@ -74,7 +79,8 @@ def customerror(module:str, e):
     return f"""{module} | {RANDOM_ERROR_LIST[random.randint(0, len(RANDOM_ERROR_LIST)-1)]} - {e}"""
 
 def forceLogFolder():
-    os.mkdir(ROAMING+"\\.RePCC\\logs")
+
+    os.makedirs(ROAMING+"\\.RePCC\\logs")
 
     logging.config.dictConfig(LOGGER_CONF)
     logger = logging.getLogger("RePCC")
@@ -95,3 +101,153 @@ def assetsPath(relativepath:str):
     """
     basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(basepath, relativepath)
+
+def sendNotification(title:str, body:str):
+
+    def _():
+        toast(
+            title=title,
+            body=body,
+            app_id="RePCC",
+            duration="short",
+            icon=assetsPath("assets/repcclogo.png")
+        )
+
+    threading.Thread(target=_).start()
+
+def getDebugSettings():
+    """
+    Fetches the settings for DEBUG yaml in user roaming.
+    """
+
+    yamlfile = ROAMING+"\\.RePCC\\settings\\debug.yaml"
+
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
+
+def getRegistryYaml():
+    """
+    Fetches the entries for REGISTRY yaml in user roaming.
+    """
+    yamlfile = ROAMING+"\\.RePCC\\data\\register.yaml"
+
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
+
+def getPresentationSettings():
+    """
+    Fetches the settings for PRESENTATIONTOOLS yaml in user roaming.
+    """
+
+    yamlfile = ROAMING+"\\.RePCC\\settings\\presentationTools.yaml"
+
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
+
+def findRegisteredHost(ip:str):
+    try:
+        registerYAML = getRegistryYaml()
+        debugYAML = getDebugSettings()
+
+        if registerYAML == None or debugYAML == None:
+            return False
+
+        _debug_allowExternal = debugYAML.get("allowExternalRequests", False)
+
+        if _debug_allowExternal == True:
+            return True
+
+        if registerYAML["IP"] == None:
+            return False
+                        
+        found = False
+        for key in registerYAML["IP"]:
+            if registerYAML["IP"][key] == ip or _debug_allowExternal == True: 
+                found = True
+                break
+
+        if found:
+            return True
+        
+        return False
+    except Exception as e:
+        print(e)
+        return False
+    
+def getWebRtcSettings():
+    """
+    Fetches the settings for WEBRTC yaml in user roaming.
+    """
+
+    yamlfile = ROAMING+"\\.RePCC\\settings\\webrtc.yaml"
+
+    if os.path.exists(yamlfile):
+
+        load = yaml.safe_load(open(yamlfile))
+        return load
+    
+    return None
+
+def getSetting(setting:str):
+    if setting == "debug":
+        return getDebugSettings()
+    if setting == "presentationTools":
+        return getPresentationSettings()
+    if setting == "webrtc":
+        return getWebRtcSettings()
+    
+    raise ValueError("Setting does not exist.")
+
+def sendRandomWakeNotif():
+
+    import random
+    import datetime
+
+    choice = None
+
+    lis = [
+        f"Hello!",
+        f"Hey!",
+        f"Yello!",
+        f"Sup!",
+        f"Hi!",
+        f"Hey there!",
+    ]
+
+    if random.randint(0,2) == 0:
+        hour = datetime.datetime.now().hour
+        print(hour)
+
+        if hour < 6:
+            choice = f"Good (very early) morning!"
+        
+        elif hour < 12:
+            choice = f"Good morning!"
+        
+        elif hour < 17:
+            choice = f"Good afternoon!"
+        
+        elif hour < 22:
+            choice = f"Good evening!"
+        
+        else:
+            choice = f"Hey! Shouldnt you be asleep?"
+    else:
+        choice = lis[random.randint(0, len(lis)-1)]
+
+    print(choice)
+    choice = f"{choice} RePCC-Server version {FILEVER} is now running. If the tray icon is not visible, please report it."
+
+    sendNotification("Startup confirmation", choice) 

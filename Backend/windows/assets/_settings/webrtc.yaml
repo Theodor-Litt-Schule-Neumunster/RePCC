@@ -1,3 +1,4 @@
 video:
   framerate: 24
   quality: 2
+  monitor: 1
