@@ -4,6 +4,7 @@
 # py -3 -m PyInstaller --onefile --add-data "assets;assets" --icon="./assets/repccBin.ico" pcmac.py
 
 import os
+import sys
 import json
 import time
 import shutil
@@ -556,8 +557,7 @@ def initializePCMAC():
             "settings",
             "assets",
             "logs",
-            "data",
-            "applications"
+            "data"
         ],
     }
     def fileVerification():
@@ -656,7 +656,10 @@ def initializePCMAC():
         if ctypes.windll.shell32.IsUserAnAdmin():
             logger.info(f"pcmac | regedit: Is running with administrative privileges.")
             try:
-                openfileExe = MACDATA + "\\applications\\openfile.exe"
+                if getattr(sys, "frozen", False):
+                    openfileExe = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), "openfile.exe")
+                else:
+                    openfileExe = os.path.join(os.environ.get("ProgramW6432", os.environ.get("ProgramFiles", "C:\\Program Files")), "RePCC", "openfile.exe")
                 openCommand = f'"{openfileExe}" "%1"'
 
                 ensure_registry_value(winreg.HKEY_CLASSES_ROOT, ".pcmac", None, "RePCC_File")
@@ -688,3 +691,5 @@ def initializePCMAC():
 
 if __name__ == "__main__":
     initializePCMAC()
+
+logger.warning("pcmac | HIT FILE END.")
