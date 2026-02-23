@@ -401,14 +401,17 @@ def registerMDNS(port:int = 15250):
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
 
+    # Changed service type from "_http._tcp.local." to "_repcc._tcp.local."
+    # Added "ports" to properties as required by the app
     serviceinfo = ServiceInfo(
-        "_http._tcp.local.",
-        f"RePCC.{hostname}._http._tcp.local.",
+        "_repcc._tcp.local.",
+        f"RePCC.{hostname}._repcc._tcp.local.",
         addresses=[socket.inet_aton(local_ip)],
         port=port,
         properties={
             "appversion":"0.1 INDEV",
             "mac":MAC,
+            "ports":str(port), # Added ports property
             "2fa":TWOFACODE
         },
         server=f"{hostname}.local.",
