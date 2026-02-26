@@ -153,7 +153,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
           if (ipAddress != null && _belongsToActiveNetwork(ipAddress, localNetworkAddresses)) {
             final device = Device(
               id: ipAddress,
-              name: srv.target,
+              name: srv.target.replaceAll(RegExp(r'\.local$'), ''),
               ipAddress: ipAddress,
               macAddress: macAddress,
               ports: ports.isNotEmpty ? ports : [8080],

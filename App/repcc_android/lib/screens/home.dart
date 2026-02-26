@@ -341,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 24,
         ),
         title: Text(
-          device.name,
+          device.name.replaceAll(RegExp(r'\.local$'), ''),
           style: TextStyle(
               color: colorScheme.onSurface,
               fontFamily: 'JetBrainsMono',
@@ -422,7 +422,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    device.name,
+                    device.name.replaceAll(RegExp(r'\.local$'), ''),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
