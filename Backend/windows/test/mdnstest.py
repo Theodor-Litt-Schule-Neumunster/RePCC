@@ -10,8 +10,6 @@ class TestListener(ServiceListener):
     def __init__(self) -> None:
         super().__init__()
 
-        MDNS_ENABLED = True
-
     def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         print(f"Service {name} updated")
         self._handle_Service(zc, type_, name)
@@ -51,7 +49,7 @@ class TestListener(ServiceListener):
 
 zeroconf = Zeroconf()
 listener = TestListener()
-browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
+browser = ServiceBrowser(zeroconf, "_repcc._tcp.local.", listener)
 
 try:
     input("Press enter to exit...\n\n")

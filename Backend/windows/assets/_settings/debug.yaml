@@ -2,6 +2,6 @@ debug: false # NOT YET IMPLEMENTED
 verbose: 0 # NOT YET IMPLEMENTED
 allowExternalRequests: true
 allowMacroExecution: true
-allowConnection: false
+allowConnection: true
 maxSavedMacs: 10
 maxSavedIPs: 10

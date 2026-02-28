@@ -397,9 +397,19 @@ async def repccConnect(request:Request):
 def registerMDNS(port:int = 15250):
 
     from args import TWOFACODE
+
+    def _get_local_ip() -> str:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
     
     hostname = socket.gethostname()
-    local_ip = socket.gethostbyname(hostname)
+    local_ip = _get_local_ip()
 
     # Changed service type from "_http._tcp.local." to "_repcc._tcp.local."
     # Added "ports" to properties as required by the app
@@ -636,15 +646,45 @@ def tray_main():
             else:
                 sendNotification("RePCC Startup", "Could not change start-on-boot state.")
 
+            # write setting = False
+            sendNotification("RePCC", "Connections blocked.")
+
+        def _connections_enabled():
+            
+            settings = getDebugSettings()
+
+            if not settings is None:
+
+                return settings.get("allowConnection", False)
+
+        def toggle_connections():
+            
+            settings = getDebugSettings()
+
+            if not settings is None:
+                settings["allowConnection"] = not settings["allowConnection"]
+
+                yaml.safe_dump(settings, open(ROAMING+"\\.RePCC\\settings\\debug.yaml", "w"))
+
         tray_menu = pystray.Menu(
             pystray.MenuItem(
-                "Start on boot",
-                toggle_autostart,
-                checked=lambda item: _autostart_enabled(),
-                enabled=lambda item: _autostart_supported()
+                "Settings",
+                pystray.Menu( 
+                    pystray.MenuItem(
+                        "Connections",
+                        toggle_connections,
+                        checked=lambda item: _connections_enabled(),
+                    ),
+                    pystray.MenuItem(
+                        "Start on boot",
+                        toggle_autostart,
+                        checked=lambda item: _autostart_enabled(),
+                        enabled=lambda item: _autostart_supported(),
+                    ),
+                ),
             ),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Exit", exit_app)
+            pystray.MenuItem("Exit", exit_app),
         )
 
         # Load tray icon with fallback
@@ -692,8 +732,8 @@ def firewallInit():
 
     # RePCC Ports:
     # - 15248 Default Port
-    # - 15249 WerRTC Port
-    # - 15250 WerRTC Port
+    # - 15249 WebRTC Port
+    # - 15250 mDNS Port
 
     logger.info("main | Checking firewall rules...")
 
@@ -763,7 +803,6 @@ def MAIN():
             return False
         
     def run_as_admin():
-        # integrating this was hell
         if not is_admin():
             if getattr(sys, "frozen", False):
                 lp_file = os.path.abspath(sys.executable)
