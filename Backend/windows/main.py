@@ -41,7 +41,8 @@ from webrtc import startWebRTCServer
 from pcmac import initializePCMAC, macro
 from args import (
     LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath, getSetting, sendRandomWakeNotif,
-    sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost
+    sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost,
+    getWebRtcSettings
 )
 
 # --
@@ -649,20 +650,38 @@ def tray_main():
             # write setting = False
             sendNotification("RePCC", "Connections blocked.")
 
-        def _connections_enabled():
+        def _setting_enabled(fileName:str=None, setting:str=None):
             
-            settings = getDebugSettings()
+            settings = None
+
+            if fileName.lower() == "debug":
+                settings = getDebugSettings()
+
+            if fileName.lower() == "presentation":
+                settings = getPresentationSettings()
+
+            if fileName.lower() == "webrtc":
+                settings = getWebRtcSettings()
 
             if not settings is None:
+                
+                return settings.get(setting, False)
 
-                return settings.get("allowConnection", False)
-
-        def toggle_connections():
+        def toggle_setting(fileName:str=None, setting:str=None):
             
-            settings = getDebugSettings()
+            settings = None
 
-            if not settings is None:
-                settings["allowConnection"] = not settings["allowConnection"]
+            if fileName.lower() == "debug":
+                settings = getDebugSettings()
+
+            if fileName.lower() == "presentation":
+                settings = getPresentationSettings()
+
+            if fileName.lower() == "webrtc":
+                settings = getWebRtcSettings()
+
+            if not settings is None and not settings.get(setting, None) is None:
+                settings[setting] = not settings[setting]
 
                 yaml.safe_dump(settings, open(ROAMING+"\\.RePCC\\settings\\debug.yaml", "w"))
 
@@ -672,8 +691,18 @@ def tray_main():
                 pystray.Menu( 
                     pystray.MenuItem(
                         "Connections",
-                        toggle_connections,
-                        checked=lambda item: _connections_enabled(),
+                        lambda icon, item: toggle_setting("debug", "allowConnection"),
+                        checked=lambda item: _setting_enabled("debug", "allowConnection"),
+                    ),
+                    pystray.MenuItem(
+                        "External requests",
+                        lambda icon, item: toggle_setting("debug", "allowExternalRequests"),
+                        checked=lambda item: _setting_enabled("debug", "allowExternalRequests"),
+                    ),
+                    pystray.MenuItem(
+                        "Macro execution",
+                        lambda icon, item: toggle_setting("debug", "allowMacroExecution"),
+                        checked=lambda item: _setting_enabled("debug", "allowMacroExecution"),
                     ),
                     pystray.MenuItem(
                         "Start on boot",
@@ -785,10 +814,6 @@ def firewallInit():
             logger.error(customerror("main", f"Failed firewall rule: {name} | {result.stderr.strip()}"))
 
 #   --------------- MAIN 
-
-# TODO:
-# - YAML DEBUG: Integrage verbose level for notifications and debug bool idk
-# - Finish Tray icon integration
 
 def MAIN():
 
