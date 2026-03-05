@@ -197,6 +197,7 @@ def _mdnsMain():
             global MDNS_ENABLED
 
             MDNS_ENABLED = True
+            self._connecting = False
 
         def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
             pass
@@ -217,28 +218,83 @@ def _mdnsMain():
                 pass
 
             if info and "repccpresentationserver" in name.lower():
-                
+
+                if self._connecting:
+                    return
+
                 print("Presentaion Server found.")
-                ip = str(ipaddress.ip_address(info.addresses[0]))
-                SERVER_IP = ip
 
-                while True:
-                    time.sleep(2)
+                candidate_ips = []
 
-                    r = requests.post(f"http://{ip}:15247/connect/{socket.gethostname()}")
+                # Prefer parsed_addresses when available, then fall back to raw bytes.
+                try:
+                    candidate_ips = info.parsed_addresses()
+                except Exception:
+                    candidate_ips = []
 
-                    if r.status_code == 200:
+                if not candidate_ips:
+                    candidate_ips = [
+                        str(ipaddress.ip_address(raw_ip))
+                        for raw_ip in info.addresses
+                    ]
 
-                        if not CLIENTWINDOW == None:
-                            CLIENTWINDOW.setConnection(True)
+                # Prefer server-provided primary address when available.
+                preferred_ip = None
+                api_port = 15247
 
-                        # Kill zeroconf and reset vars
-                        zeroconf.close() # type: ignore
-                        
-                        MDNS_ENABLED = False
-                    
-                        return
-                    print("not 200")
+                properties = info.properties or {}
+                if b"preferred_ip" in properties:
+                    try:
+                        preferred_ip = properties[b"preferred_ip"].decode("utf-8")
+                    except Exception:
+                        preferred_ip = None
+
+                if b"api_port" in properties:
+                    try:
+                        api_port = int(properties[b"api_port"].decode("utf-8"))
+                    except Exception:
+                        api_port = 15247
+
+                if preferred_ip and preferred_ip in candidate_ips:
+                    candidate_ips.remove(preferred_ip)
+                    candidate_ips.insert(0, preferred_ip)
+
+                print(f"Candidate server IPs: {candidate_ips} (api_port={api_port})")
+
+                def _connect_worker():
+                    global MDNS_ENABLED, SERVER_IP
+
+                    try:
+                        while True:
+                            time.sleep(2)
+
+                            for ip in candidate_ips:
+                                try:
+                                    r = requests.post(
+                                        f"http://{ip}:{api_port}/connect/{socket.gethostname()}",
+                                        timeout=(1, 2),
+                                    )
+                                except requests.RequestException:
+                                    continue
+
+                                if r.status_code == 200:
+                                    SERVER_IP = ip
+
+                                    if not CLIENTWINDOW == None:
+                                        CLIENTWINDOW.setConnection(True)
+
+                                    # Kill zeroconf and reset vars
+                                    zeroconf.close() # type: ignore
+                                    MDNS_ENABLED = False
+                                    print(f"Connected to server on {ip}:{api_port}")
+                                    return
+
+                            print("Connection failed for all advertised IPs, retrying...")
+                    finally:
+                        self._connecting = False
+
+                self._connecting = True
+                threading.Thread(target=_connect_worker, daemon=True).start()
 
     mdnsHandler()
 

@@ -1,7 +1,7 @@
 
 # pyinstaller --noconfirm --onefile --noconsole --manifest base/manifest.manifest --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
 
-# Debugger notes: Please run VSC as Administrator to debug this within VSC. ( Or any IDE you're using )
+# Debugger notes: Please run VSC as Administrator to debug this within VSC. ( Or any IDE you're using ) (Not required to run with admin)
 
 # imports
 

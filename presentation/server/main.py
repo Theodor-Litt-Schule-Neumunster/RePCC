@@ -1,4 +1,5 @@
 # pyinstaller --noconfirm --onefile --noconsole --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
+# pyinstaller --noconfirm --onefile --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
 
 import os
 import sys
@@ -6,6 +7,7 @@ import json
 import time
 import shutil
 import socket
+import ipaddress
 import pystray
 import uvicorn
 import datetime
@@ -278,16 +280,69 @@ def assetsPath(relativepath:str):
     basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(basepath, relativepath)
 
+def _get_primary_ipv4() -> str:
+    """
+    Resolve the IPv4 currently used for outbound traffic.
+    This avoids advertising host-only/virtual adapter addresses.
+    """
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("1.1.1.1", 80))
+        return sock.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        sock.close()
+
+def _get_mdns_ipv4_addresses() -> list:
+    """
+    Build an ordered IPv4 list for mDNS announcement.
+    The first address is the preferred LAN address used by the client.
+    """
+
+    ordered_ips = []
+
+    primary_ip = _get_primary_ipv4()
+    if primary_ip and not primary_ip.startswith("127."):
+        ordered_ips.append(primary_ip)
+
+    try:
+        host_ips = socket.gethostbyname_ex(socket.gethostname())[2]
+        for ip in host_ips:
+            if ip and not ip.startswith("127.") and ip not in ordered_ips:
+                ordered_ips.append(ip)
+    except Exception:
+        pass
+
+    if not ordered_ips:
+        ordered_ips.append("127.0.0.1")
+
+    return [socket.inet_aton(ip) for ip in ordered_ips]
+
+def _get_mdns_ipv4_strings() -> list:
+    addresses = _get_mdns_ipv4_addresses()
+    return [str(ipaddress.ip_address(addr)) for addr in addresses]
+
 def _mdnsMain(port:int):
     hostname = socket.gethostname()
-    local_ip = socket.gethostbyname(hostname)
+    mdns_addresses = _get_mdns_ipv4_addresses()
+    mdns_address_strings = _get_mdns_ipv4_strings()
+
+    preferred_ip = mdns_address_strings[0] if mdns_address_strings else "127.0.0.1"
+
+    addActivity(f"mDNS advertise IPs: {', '.join(mdns_address_strings)}")
 
     serviceinfo = ServiceInfo(
         "_http._tcp.local.",
         f"repccpresentationserver.{hostname}._http._tcp.local.",
-        addresses=[socket.inet_aton(local_ip)],
+        addresses=mdns_addresses,
         port=port,
         server=f"{hostname}.local.",
+        properties={
+            "api_port": "15247",
+            "preferred_ip": preferred_ip,
+        },
     )
 
     zc = Zeroconf()
