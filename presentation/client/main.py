@@ -334,11 +334,27 @@ def _httpMain():
 
     @FAPI.get("/next")
     async def FAPI_next():
-        pyautogui.press("right")
+        try:
+            pyautogui.press("right")
+            return JSONResponse({}, status_code=200)
+        except pyautogui.FailSafeException as e:
+            print(f"failsafe on /next: {e}")
+            return JSONResponse({"error": "pyautogui fail-safe triggered"}, status_code=409)
+        except Exception as e:
+            print(f"/next error: {e}")
+            return JSONResponse({"error": "failed to send next input"}, status_code=500)
 
     @FAPI.get("/prev")
     async def FAPI_prev():
-        pyautogui.press("left")
+        try:
+            pyautogui.press("left")
+            return JSONResponse({}, status_code=200)
+        except pyautogui.FailSafeException as e:
+            print(f"failsafe on /prev: {e}")
+            return JSONResponse({"error": "pyautogui fail-safe triggered"}, status_code=409)
+        except Exception as e:
+            print(f"/prev error: {e}")
+            return JSONResponse({"error": "failed to send prev input"}, status_code=500)
 
 # TODO:
 # - check if connection stays, if not: reopen ZC (Done? idrk atp)

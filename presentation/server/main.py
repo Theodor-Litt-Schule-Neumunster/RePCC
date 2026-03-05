@@ -48,11 +48,13 @@ WINDOW, APP = None, False
 class MainWindow(QMainWindow):
 
     toggle_signal = pyqtSignal()
+    activity_signal = pyqtSignal(str)
 
     def __init__(self) -> None:
         super().__init__()
 
         self.toggle_signal.connect(self.toggle_visibility)
+        self.activity_signal.connect(self._appendActivity)
 
         self.setWindowTitle("RePCC presenter control")
         self.resize(950,520)
@@ -125,10 +127,17 @@ class MainWindow(QMainWindow):
 
         threading.Thread(target=self._reloadThread, daemon=True).start()
 
-    def addActivity(self, message:str):
+    def _appendActivity(self, message:str):
         self.logList.insertItem(0, f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}")
 
+    def addActivity(self, message:str):
+        self.activity_signal.emit(message)
+
     def loadConnections(self): # NOTE: LOCK FILE integrated.
+        # Preserve list scroll position across periodic refreshes.
+        scroll_bar = self.listWidget.verticalScrollBar()
+        old_scroll_value = scroll_bar.value()
+
         self.listWidget.clear()
 
         try:
@@ -151,7 +160,7 @@ class MainWindow(QMainWindow):
 
                     self.listWidget.addItem(listText)
         finally:
-            pass
+            scroll_bar.setValue(min(old_scroll_value, scroll_bar.maximum()))
 
     def _reloadThread(self):
         while True:
@@ -186,14 +195,18 @@ class MainWindow(QMainWindow):
         if not self.selected_file_path:
             self.addActivity("Can't upload file if none is selected.")
             return
+
+        self.addActivity("Starting upload thread.")
+        threading.Thread(target=self._sendFileWorker, daemon=True).start()
+
+    def _sendFileWorker(self):
         
         try:
             filename = os.path.basename(self.selected_file_path)
             
-            files = None
             connections = None
             with open(self.selected_file_path, "rb") as f:
-                files = {"file": (filename, f.read())}
+                file_bytes = f.read()
                 f.close()
 
             with file_lock:
@@ -204,21 +217,49 @@ class MainWindow(QMainWindow):
             if connections == None:
                 connections = []
 
+            stats_lock = threading.Lock()
+            stats = {
+                "ok": 0,
+                "failed": 0,
+            }
+
+            threads = []
+
+            def _upload_to_client(ip: str):
+                ad = f"http://{ip}:11111/presentaion" # NOTE: ad as in ADDRESS, NOTE: POST IS TESTPORT! NORMAL IS 15247
+                self.addActivity(f"Sending {filename} to {ad}")
+
+                try:
+                    r = requests.post(ad, files={"file": (filename, file_bytes)}, timeout=5)
+                except requests.RequestException as e:
+                    with stats_lock:
+                        stats["failed"] += 1
+                    self.addActivity(f"Upload failed for {ip}: {e}")
+                    return
+
+                if r.status_code == 200:
+                    with stats_lock:
+                        stats["ok"] += 1
+                    self.addActivity(f"Successfully uploaded to {ip}.")
+                else:
+                    with stats_lock:
+                        stats["failed"] += 1
+                    self.addActivity(f"Upload failed for {ip} with code {r.status_code}")
+
             for i in range(len(connections)):
                 data = connections[i]
-
                 ip = data.get("host", None)
-                ad = f"http://{ip}:11111/presentaion" # NOTE: ad as in ADDRESS, NOTE: POST IS TESTPORT! NORMAL IS 15247
-                if not ip == None:
-                    self.addActivity(f"Sending {filename} to {ad}")
-                    r = requests.post(ad, files=files, timeout=5)
+                if ip == None:
+                    continue
 
-                    if r.status_code == 200:
-                        self.addActivity("Successfully uploaded.")
-                    else:
-                        self.addActivity(f"Upload failed with code {r.status_code}")
+                t = threading.Thread(target=_upload_to_client, args=(ip,), daemon=True)
+                threads.append(t)
+                t.start()
 
-            self.addActivity(" -- Upload finished.")
+            for t in threads:
+                t.join()
+
+            self.addActivity(f" -- Upload finished. success={stats['ok']} failed={stats['failed']}")
 
         except Exception as e:
             print(e)
@@ -237,20 +278,88 @@ class MainWindow(QMainWindow):
         if data == None:
             data = []
 
+        summary = {
+            "ok": 0,
+            "failed": 0,
+            "failsafe": 0,
+            "recovered": 0,
+        }
+
+        def _is_failsafe_response(resp: requests.Response) -> bool:
+            if resp.status_code != 409:
+                return False
+
+            try:
+                payload = resp.json()
+                err = str(payload.get("error", "")).lower()
+                return "fail-safe" in err or "failsafe" in err
+            except Exception:
+                return False
+
+        summary_lock = threading.Lock()
+        threads = []
+
+        def _send_slide(address: str):
+            http = f"http://{address}:11111/{direction}" # NOTE: TEST PORT!
+            try:
+                r = requests.get(http, timeout=3)
+            except requests.RequestException as e:
+                with summary_lock:
+                    summary["failed"] += 1
+                addActivity(f"!! ERROR! Failed {direction} slide for {address}: {e}")
+                return
+
+            if r.status_code == 200:
+                with summary_lock:
+                    summary["ok"] += 1
+                addActivity(f"Send {direction} slide for {address}")
+                return
+
+            if _is_failsafe_response(r):
+                with summary_lock:
+                    summary["failsafe"] += 1
+                addActivity(f"Fail-safe on {address}. Retrying {direction} once...")
+
+
+                try:
+                    retry = requests.get(http, timeout=3)
+                except requests.RequestException as e:
+                    with summary_lock:
+                        summary["failed"] += 1
+                    addActivity(f"!! ERROR! Retry failed for {address}: {e}")
+                    return
+
+                if retry.status_code == 200:
+                    with summary_lock:
+                        summary["ok"] += 1
+                        summary["recovered"] += 1
+                    addActivity(f"Recovered {direction} slide for {address} after fail-safe")
+                else:
+                    with summary_lock:
+                        summary["failed"] += 1
+                    addActivity(f"!! ERROR! Retry {direction} failed for {address} (code {retry.status_code})")
+                return
+
+            with summary_lock:
+                summary["failed"] += 1
+            addActivity(f"!! ERROR! Failed {direction} slide for {address} (code {r.status_code})")
+
         for i in range(len(data)):
 
             subdata = data[i]
             address = subdata.get("host", "None")
 
-            if not address == None:
+            if address == None:
+                continue
 
-                http = f"http://{address}:11111/{direction}" # NOTE: TEST PORT!
-                r = requests.get(http)
+            t = threading.Thread(target=_send_slide, args=(address,), daemon=True)
+            threads.append(t)
+            t.start()
 
-                if r.status_code == 200:
-                    addActivity(f"Send {direction} slide for {address}")
-                else:
-                    addActivity(f"!! ERROR! Failed {direction} slide for {address} !!")
+        for t in threads:
+            t.join()
+
+        return summary
 
 def addActivity(message:str):
     if not WINDOW == None:
@@ -491,19 +600,45 @@ def _requestsMain():
 
         @REQ_APP.get("/present/next")
         async def fapi_present_next(request:Request):
-            if not WINDOW == None:
+            if WINDOW == None:
+                return JSONResponse({"error":"window not ready"}, status_code=503)
+
+            try:
                 pyautogui.press("right")
-                WINDOW.nextClientSlide("next")
+            except pyautogui.FailSafeException as e:
+                addActivity(f"Local fail-safe on /present/next: {e}")
+                return JSONResponse({"error":"local pyautogui fail-safe triggered"}, status_code=409)
+            except Exception as e:
+                addActivity(f"Local /present/next failed: {e}")
+                return JSONResponse({"error":"local next input failed"}, status_code=500)
+
+            result = WINDOW.nextClientSlide("next")
+            failed = result.get("failed", 0)
+            status = 200 if failed == 0 else 207
+            return JSONResponse(result, status_code=status)
 
         @REQ_APP.get("/present/prev")
         async def fapi_present_prev(request:Request):
-            if not WINDOW == None:
+            if WINDOW == None:
+                return JSONResponse({"error":"window not ready"}, status_code=503)
+
+            try:
                 pyautogui.press("left")
-                WINDOW.nextClientSlide("prev")
+            except pyautogui.FailSafeException as e:
+                addActivity(f"Local fail-safe on /present/prev: {e}")
+                return JSONResponse({"error":"local pyautogui fail-safe triggered"}, status_code=409)
+            except Exception as e:
+                addActivity(f"Local /present/prev failed: {e}")
+                return JSONResponse({"error":"local prev input failed"}, status_code=500)
+
+            result = WINDOW.nextClientSlide("prev")
+            failed = result.get("failed", 0)
+            status = 200 if failed == 0 else 207
+            return JSONResponse(result, status_code=status)
 
     requestInit()
 
-    threading.Thread(target=timeoutHandler, args=(10,)).start()
+    threading.Thread(target=timeoutHandler, args=(30,)).start()
     uvicorn.run(REQ_APP, host="0.0.0.0", port=15247)
 
 def _trayMain():
