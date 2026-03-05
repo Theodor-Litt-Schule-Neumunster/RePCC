@@ -597,25 +597,185 @@ def autostartInit():
 #   --------------- MENU TRAY
 
 def tray_main():
-
-    # TODO:
-    #   - Close
-    #   - Settings
-    #       - Disallow / Allow connections
-    #
-    #   - Connected Clients
-    #       - Disconnect from client
-    #
-    #   - Open Dashboard (MainWindow)
-    #   - Macros (Lists Macros)
-    #       - [ANY MACRO]
-    #           - Delete / Run / Edit
-    #       - Add Macro
-
-
     try:
+        MACROS_DIR = os.path.join(ROAMING, ".RePCC", "macros")
+        PROGRAM_FILES = os.environ.get("ProgramW6432", os.environ.get("ProgramFiles", "C:\\Program Files"))
+        DESKTOP_APP_PATH = os.path.join(PROGRAM_FILES, "RePCC", "RePCC-Desktop.exe")
+
+        active_macro_runner = None
+        active_macro_thread = None
+        macro_thread_lock = threading.Lock()
+        error_box_lock = threading.Lock()
+        error_box_showing = False
+
+        def show_error_box(title: str, message: str):
+            nonlocal error_box_showing
+
+            def _show_box():
+                nonlocal error_box_showing
+                try:
+                    ctypes.windll.user32.MessageBoxW(
+                        0,
+                        message,
+                        title,
+                        0x10 | 0x10000 | 0x40000,
+                    )
+                except Exception as e:
+                    logger.error(customerror("main", f"Failed to show error box: {e}"))
+                finally:
+                    with error_box_lock:
+                        error_box_showing = False
+
+            with error_box_lock:
+                if error_box_showing:
+                    return
+                error_box_showing = True
+
+            threading.Thread(target=_show_box, daemon=True).start()
+
+        def launch_desktop_app(arguments: list, show_error: bool = False, notify_missing: bool = False):
+            if not os.path.exists(DESKTOP_APP_PATH):
+                if notify_missing:
+                    sendNotification("RePCC", "RePCC-Desktop app does not exist.")
+                if show_error:
+                    show_error_box("RePCC", "RePCC-Desktop.exe was not found in Program Files.")
+                return False
+
+            try:
+                subprocess.Popen([DESKTOP_APP_PATH, *arguments], creationflags=CREATE_NO_WINDOW)
+                return True
+            except Exception as e:
+                logger.error(customerror("main", f"Failed to open desktop app: {e}"))
+                if notify_missing:
+                    sendNotification("RePCC", "Failed to open RePCC-Desktop app.")
+                if show_error:
+                    show_error_box("RePCC", "Failed to launch RePCC-Desktop.exe.")
+                return False
+
+        def list_macro_files():
+            if not os.path.exists(MACROS_DIR):
+                return []
+
+            return sorted([x for x in os.listdir(MACROS_DIR) if x.lower().endswith(".pcmac")])
+
+        def stop_active_macro():
+            nonlocal active_macro_runner
+            nonlocal active_macro_thread
+
+            with macro_thread_lock:
+                runner = active_macro_runner
+                thread = active_macro_thread
+
+            if not runner or not thread:
+                return
+
+            runner.kill = True
+            if hasattr(runner, "listener") and runner.listener:
+                try:
+                    runner.listener.stop()
+                except Exception:
+                    pass
+
+            if thread.is_alive():
+                thread.join(timeout=5)
+
+            with macro_thread_lock:
+                if active_macro_thread is thread and not thread.is_alive():
+                    active_macro_runner = None
+                    active_macro_thread = None
+
+        def refresh_menu(icon):
+            icon.menu = build_tray_menu()
+            icon.update_menu()
+
+        def run_macro_from_tray(icon, item, macro_file_name: str):
+            nonlocal active_macro_runner
+            nonlocal active_macro_thread
+
+            stop_active_macro()
+
+            macro_path = os.path.join(MACROS_DIR, macro_file_name)
+            if not os.path.exists(macro_path):
+                sendNotification("Macro", f"Macro '{macro_file_name}' does not exist.")
+                refresh_menu(icon)
+                return
+
+            runner = macro()
+            if not runner.verifyStructure(macro_path):
+                sendNotification("Macro", f"Macro '{macro_file_name}' has invalid structure.")
+                refresh_menu(icon)
+                return
+
+            def worker():
+                try:
+                    runner.runMacro(macro_file_name)
+                except Exception as e:
+                    logger.error(customerror("main", f"Tray macro run failed: {e}"))
+                finally:
+                    nonlocal active_macro_runner
+                    nonlocal active_macro_thread
+                    with macro_thread_lock:
+                        if active_macro_runner is runner:
+                            active_macro_runner = None
+                            active_macro_thread = None
+
+            thread = threading.Thread(target=worker, daemon=True)
+
+            with macro_thread_lock:
+                active_macro_runner = runner
+                active_macro_thread = thread
+
+            thread.start()
+            sendNotification("Macro", f"Started macro '{macro_file_name}'.")
+            refresh_menu(icon)
+
+        def delete_macro_from_tray(icon, item, macro_file_name: str):
+            macro_path = os.path.join(MACROS_DIR, macro_file_name)
+
+            if not os.path.exists(macro_path):
+                sendNotification("Macro", f"Macro '{macro_file_name}' does not exist.")
+                refresh_menu(icon)
+                return
+
+            try:
+                os.remove(macro_path)
+                sendNotification("Macro", f"Deleted macro '{macro_file_name}'.")
+            except Exception as e:
+                logger.error(customerror("main", f"Failed deleting macro {macro_file_name}: {e}"))
+                sendNotification("Macro", f"Failed to delete macro '{macro_file_name}'.")
+
+            refresh_menu(icon)
+
+        def edit_macro_from_tray(icon, item, macro_file_name: str):
+            macro_path = os.path.join(MACROS_DIR, macro_file_name)
+
+            desktop_opened = launch_desktop_app(["--edit", macro_path], show_error=True, notify_missing=False)
+            if desktop_opened:
+                refresh_menu(icon)
+                return
+
+            try:
+                subprocess.Popen(["notepad.exe", macro_path], creationflags=CREATE_NO_WINDOW)
+            except Exception as e:
+                logger.error(customerror("main", f"Failed opening notepad for macro edit: {e}"))
+
+            refresh_menu(icon)
+
+        def open_dashboard(icon, item):
+            if not launch_desktop_app(["--dashboard"], show_error=True, notify_missing=False):
+                return
+
+        def add_macro(icon, item):
+            if not launch_desktop_app(["--create"], show_error=False, notify_missing=True):
+                return
+
+            refresh_menu(icon)
+
         def exit_app(icon, item):
             logger.info("main | Tray exit requested.")
+
+            stop_active_macro()
+
             try:
                 if MDNS and SERVICEINFO:
                     MDNS.unregister_service(SERVICEINFO)
@@ -685,36 +845,93 @@ def tray_main():
 
                 yaml.safe_dump(settings, open(ROAMING+"\\.RePCC\\settings\\debug.yaml", "w"))
 
-        tray_menu = pystray.Menu(
-            pystray.MenuItem(
-                "Settings",
-                pystray.Menu( 
-                    pystray.MenuItem(
-                        "Connections",
-                        lambda icon, item: toggle_setting("debug", "allowConnection"),
-                        checked=lambda item: _setting_enabled("debug", "allowConnection"),
-                    ),
-                    pystray.MenuItem(
-                        "External requests",
-                        lambda icon, item: toggle_setting("debug", "allowExternalRequests"),
-                        checked=lambda item: _setting_enabled("debug", "allowExternalRequests"),
-                    ),
-                    pystray.MenuItem(
-                        "Macro execution",
-                        lambda icon, item: toggle_setting("debug", "allowMacroExecution"),
-                        checked=lambda item: _setting_enabled("debug", "allowMacroExecution"),
-                    ),
-                    pystray.MenuItem(
-                        "Start on boot",
-                        toggle_autostart,
-                        checked=lambda item: _autostart_enabled(),
-                        enabled=lambda item: _autostart_supported(),
+        def build_macro_menu_items():
+            items = []
+            macro_files = list_macro_files()
+
+            def run_handler(macro_file_name: str):
+                def _handler(icon, item):
+                    run_macro_from_tray(icon, item, macro_file_name)
+                return _handler
+
+            def delete_handler(macro_file_name: str):
+                def _handler(icon, item):
+                    delete_macro_from_tray(icon, item, macro_file_name)
+                return _handler
+
+            def edit_handler(macro_file_name: str):
+                def _handler(icon, item):
+                    edit_macro_from_tray(icon, item, macro_file_name)
+                return _handler
+
+            if len(macro_files) == 0:
+                items.append(pystray.MenuItem("No macros found", lambda icon, item: None, enabled=False))
+            else:
+                for macro_file in macro_files:
+                    macro_name = macro_file[:-6]
+                    items.append(
+                        pystray.MenuItem(
+                            macro_name,
+                            pystray.Menu(
+                                pystray.MenuItem(
+                                    "Run",
+                                    run_handler(macro_file),
+                                ),
+                                pystray.MenuItem(
+                                    "Delete",
+                                    delete_handler(macro_file),
+                                ),
+                                pystray.MenuItem(
+                                    "Edit",
+                                    edit_handler(macro_file),
+                                ),
+                            ),
+                        )
+                    )
+
+            items.append(pystray.Menu.SEPARATOR)
+            items.append(pystray.MenuItem("Add Macro", add_macro))
+            items.append(pystray.MenuItem("Refresh", lambda icon, item: refresh_menu(icon)))
+            return items
+
+        def build_tray_menu():
+            return pystray.Menu(
+                pystray.MenuItem(
+                    "Settings",
+                    pystray.Menu( 
+                        pystray.MenuItem(
+                            "Connections",
+                            lambda icon, item: toggle_setting("debug", "allowConnection"),
+                            checked=lambda item: _setting_enabled("debug", "allowConnection"),
+                        ),
+                        pystray.MenuItem(
+                            "External requests",
+                            lambda icon, item: toggle_setting("debug", "allowExternalRequests"),
+                            checked=lambda item: _setting_enabled("debug", "allowExternalRequests"),
+                        ),
+                        pystray.MenuItem(
+                            "Macro execution",
+                            lambda icon, item: toggle_setting("debug", "allowMacroExecution"),
+                            checked=lambda item: _setting_enabled("debug", "allowMacroExecution"),
+                        ),
+                        pystray.MenuItem(
+                            "Start on boot",
+                            toggle_autostart,
+                            checked=lambda item: _autostart_enabled(),
+                            enabled=lambda item: _autostart_supported(),
+                        ),
                     ),
                 ),
-            ),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Exit", exit_app),
-        )
+                pystray.MenuItem("Open Dashboard", open_dashboard),
+                pystray.MenuItem(
+                    "Macros",
+                    pystray.Menu(*build_macro_menu_items()),
+                ),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Exit", exit_app),
+            )
+
+        tray_menu = build_tray_menu()
 
         # Load tray icon with fallback
         image = None

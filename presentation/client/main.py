@@ -317,11 +317,19 @@ if __name__ == "__main__":
 
     CLIENTWINDOW  = ClientWindow(str(data))
 
+    def _start_api():
+        try:
+            uvicorn.run(
+                FAPI,
+                host="0.0.0.0",
+                port=11111,
+                access_log=False,
+                log_config=None,
+            )
+        except Exception as e:
+            print(f"[API] Uvicorn failed: {e}")
+
     threading.Thread(target=_trayMain, args=(CLIENTWINDOW, app), daemon=True).start()
     threading.Thread(target=_mdnsMain, daemon=True).start()
-    threading.Thread(target=uvicorn.run, kwargs={
-        "app": FAPI,
-        "host": "0.0.0.0",
-        "port": 11111 # NOTE: TEST PORT! NORMAL IS 15247
-    }, daemon=True).start()
+    threading.Thread(target=_start_api, daemon=True).start()
     sys.exit(app.exec_())
