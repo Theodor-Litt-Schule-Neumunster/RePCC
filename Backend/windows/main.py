@@ -399,15 +399,51 @@ def registerMDNS(port:int = 15250):
 
     from args import TWOFACODE
 
+    def _is_private_ipv4(ip: str) -> bool:
+        return (
+            ip.startswith("10.") or
+            ip.startswith("192.168.") or
+            (ip.startswith("172.") and 16 <= int(ip.split(".")[1]) <= 31)
+        )
+
     def _get_local_ip() -> str:
+        candidates = []
+
+        # Prefer interface-derived IPv4 addresses, not DNS hostname resolution.
+        try:
+            for _, _, _, _, sockaddr in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                ip = sockaddr[0]
+                if ip != "127.0.0.1":
+                    candidates.append(ip)
+        except Exception:
+            pass
+
+        # Also ask OS routing table for the preferred outbound interface without sending traffic.
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
+            s.connect(("10.255.255.255", 1))
+            candidates.append(s.getsockname()[0])
         except Exception:
-            return "127.0.0.1"
+            pass
+        finally:
+            try:
+                s.close()
+            except Exception:
+                pass
+
+        for ip in candidates:
+            if _is_private_ipv4(ip):
+                return ip
+
+        for ip in candidates:
+            if ip != "127.0.0.1":
+                return ip
+
+        try:
+            logger.warning("main | Could not determine non-loopback IP for mDNS; falling back to 127.0.0.1")
+        except Exception:
+            pass
+        return "127.0.0.1"
     
     hostname = socket.gethostname()
     local_ip = _get_local_ip()
