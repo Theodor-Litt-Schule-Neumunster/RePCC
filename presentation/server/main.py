@@ -6,6 +6,7 @@ import sys
 import json
 import time
 import socket
+import subprocess
 import ipaddress
 import pystray
 import uvicorn
@@ -22,7 +23,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QListWidget, QScrollArea, QLabel, QFileDialog
+    QPushButton, QListWidget, QScrollArea, QLabel, QFileDialog, QComboBox
 )
 
 from fastapi import FastAPI, Request
@@ -65,7 +66,7 @@ class MainWindow(QMainWindow):
         mainLayout = QHBoxLayout(mainWidget)
 
         panel_left = QWidget()
-        panel_left.setFixedWidth(100)
+        panel_left.setFixedWidth(150)
         layout_left = QVBoxLayout(panel_left)
 
         button_reload = QPushButton("Refresh")
@@ -97,6 +98,20 @@ class MainWindow(QMainWindow):
         button_shutdown = QPushButton("Shutdown clients")
         button_shutdown.clicked.connect(self.shutdownClients)
         layout_left.addWidget(button_shutdown)
+
+        layout_left.addWidget(QLabel("mDNS Adapter"))
+
+        self.mdns_adapter_combo = QComboBox()
+        self.mdns_adapter_combo.currentIndexChanged.connect(self._on_mdns_adapter_changed)
+        layout_left.addWidget(self.mdns_adapter_combo)
+
+        button_refresh_adapters = QPushButton("Refresh adapters")
+        button_refresh_adapters.clicked.connect(self.reloadMdnsAdapters)
+        layout_left.addWidget(button_refresh_adapters)
+
+        self.mdns_adapter_options = []
+        self.selected_mdns_ip = None
+        self.reloadMdnsAdapters(log_result=False)
 
         layout_left.addStretch(1)
 
@@ -137,6 +152,46 @@ class MainWindow(QMainWindow):
 
     def addActivity(self, message:str):
         self.activity_signal.emit(message)
+
+    def reloadMdnsAdapters(self, log_result:bool=True):
+        options = _discover_ipv4_interface_options()
+
+        self.mdns_adapter_options = [{"label": "Auto (Default Route)", "ip": None}] + options
+
+        old_selected_ip = self.selected_mdns_ip
+        self.mdns_adapter_combo.blockSignals(True)
+        self.mdns_adapter_combo.clear()
+
+        target_index = 0
+        for idx, option in enumerate(self.mdns_adapter_options):
+            self.mdns_adapter_combo.addItem(option["label"])
+            if old_selected_ip and option.get("ip") == old_selected_ip:
+                target_index = idx
+
+        self.mdns_adapter_combo.setCurrentIndex(target_index)
+        self.selected_mdns_ip = self.mdns_adapter_options[target_index].get("ip")
+        self.mdns_adapter_combo.blockSignals(False)
+
+        if log_result:
+            if self.selected_mdns_ip:
+                self.addActivity(f"mDNS adapter set to {self.selected_mdns_ip}")
+            else:
+                self.addActivity("mDNS adapter set to Auto (Default Route)")
+
+    def _on_mdns_adapter_changed(self, index:int):
+        if index < 0 or index >= len(self.mdns_adapter_options):
+            self.selected_mdns_ip = None
+            return
+
+        selected = self.mdns_adapter_options[index]
+        self.selected_mdns_ip = selected.get("ip")
+        if self.selected_mdns_ip:
+            self.addActivity(f"Selected mDNS adapter IP: {self.selected_mdns_ip}")
+        else:
+            self.addActivity("Selected mDNS adapter: Auto (Default Route)")
+
+    def getSelectedMdnsIp(self):
+        return self.selected_mdns_ip
 
     def loadConnections(self): # NOTE: LOCK FILE integrated.
         # Preserve list scroll position across periodic refreshes.
@@ -495,7 +550,96 @@ def _get_primary_ipv4() -> str:
     finally:
         sock.close()
 
-def _get_mdns_ipv4_addresses() -> list:
+def _is_valid_ipv4(ip:str) -> bool:
+    try:
+        parsed = ipaddress.ip_address(ip)
+        return isinstance(parsed, ipaddress.IPv4Address)
+    except Exception:
+        return False
+
+def _get_host_ipv4_candidates() -> list:
+    ordered_ips = []
+
+    primary_ip = _get_primary_ipv4()
+    if _is_valid_ipv4(primary_ip) and not primary_ip.startswith("127."):
+        ordered_ips.append(primary_ip)
+
+    try:
+        host_ips = socket.gethostbyname_ex(socket.gethostname())[2]
+        for ip in host_ips:
+            if _is_valid_ipv4(ip) and not ip.startswith("127.") and ip not in ordered_ips:
+                ordered_ips.append(ip)
+    except Exception:
+        pass
+
+    return ordered_ips
+
+def _discover_ipv4_interface_options() -> list:
+    """
+    Discover adapter/IP pairs that can be used for mDNS advertisement.
+    On Windows this uses PowerShell adapter metadata so users can avoid VPN/tunnel adapters.
+    """
+
+    options = []
+    ethernet_options = []
+    seen = set()
+
+    if os.name == "nt":
+        try:
+            ps_command = (
+                "$items = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | "
+                "Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254*' } | "
+                "ForEach-Object { "
+                "$adapter = Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue; "
+                "if ($adapter -and $adapter.Status -eq 'Up') { "
+                "[PSCustomObject]@{ Alias=$adapter.InterfaceAlias; Description=$adapter.InterfaceDescription; IP=$_.IPAddress } "
+                "} "
+                "}; "
+                "$items | Sort-Object Alias, IP | ConvertTo-Json -Compress"
+            )
+
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps_command],
+                capture_output=True,
+                text=True,
+                timeout=4,
+            )
+
+            if result.returncode == 0 and result.stdout.strip():
+                parsed = json.loads(result.stdout)
+                if isinstance(parsed, dict):
+                    parsed = [parsed]
+
+                for entry in parsed:
+                    ip = str(entry.get("IP", "")).strip()
+                    alias = str(entry.get("Alias", "Interface")).strip() or "Interface"
+                    description = str(entry.get("Description", "")).strip()
+
+                    if not _is_valid_ipv4(ip) or ip in seen:
+                        continue
+
+                    option = {"label": f"{alias} ({ip})", "ip": ip}
+                    adapter_text = f"{alias} {description}".lower()
+                    if "ethernet" in adapter_text:
+                        ethernet_options.append(option)
+
+                    options.append(option)
+                    seen.add(ip)
+        except Exception:
+            pass
+
+    if ethernet_options:
+        return ethernet_options
+
+    if not options:
+        for ip in _get_host_ipv4_candidates():
+            if ip not in seen:
+                options.append({"label": f"Detected ({ip})", "ip": ip})
+                seen.add(ip)
+
+    return options
+
+def _get_mdns_ipv4_addresses(preferred_ip:str=None) -> list:
     """
     Build an ordered IPv4 list for mDNS announcement.
     The first address is the preferred LAN address used by the client.
@@ -503,35 +647,32 @@ def _get_mdns_ipv4_addresses() -> list:
 
     ordered_ips = []
 
-    primary_ip = _get_primary_ipv4()
-    if primary_ip and not primary_ip.startswith("127."):
-        ordered_ips.append(primary_ip)
+    if preferred_ip and _is_valid_ipv4(preferred_ip) and not preferred_ip.startswith("127."):
+        ordered_ips.append(preferred_ip)
 
-    try:
-        host_ips = socket.gethostbyname_ex(socket.gethostname())[2]
-        for ip in host_ips:
-            if ip and not ip.startswith("127.") and ip not in ordered_ips:
-                ordered_ips.append(ip)
-    except Exception:
-        pass
+    host_ips = _get_host_ipv4_candidates()
+    for ip in host_ips:
+        if ip not in ordered_ips:
+            ordered_ips.append(ip)
 
     if not ordered_ips:
         ordered_ips.append("127.0.0.1")
 
     return [socket.inet_aton(ip) for ip in ordered_ips]
 
-def _get_mdns_ipv4_strings() -> list:
-    addresses = _get_mdns_ipv4_addresses()
+def _get_mdns_ipv4_strings(preferred_ip:str=None) -> list:
+    addresses = _get_mdns_ipv4_addresses(preferred_ip=preferred_ip)
     return [str(ipaddress.ip_address(addr)) for addr in addresses]
 
-def _mdnsMain(port:int):
+def _mdnsMain(port:int, preferred_ip:str=None):
     hostname = socket.gethostname()
-    mdns_addresses = _get_mdns_ipv4_addresses()
-    mdns_address_strings = _get_mdns_ipv4_strings()
+    mdns_addresses = _get_mdns_ipv4_addresses(preferred_ip=preferred_ip)
+    mdns_address_strings = _get_mdns_ipv4_strings(preferred_ip=preferred_ip)
 
     preferred_ip = mdns_address_strings[0] if mdns_address_strings else "127.0.0.1"
 
     addActivity(f"mDNS advertise IPs: {', '.join(mdns_address_strings)}")
+    addActivity(f"Preffered: {preferred_ip}")
 
     serviceinfo = ServiceInfo(
         "_http._tcp.local.",
@@ -818,7 +959,11 @@ def _trayMain():
             addActivity(f"Toggled mDNS to {mdnsActivity.enabled}") # type: ignore
 
             if mdnsActivity.enabled == True: # type: ignore
-                zc, serviceinfo = _mdnsMain(15248)
+                selected_ip = None
+                if WINDOW is not None:
+                    selected_ip = WINDOW.getSelectedMdnsIp() # type: ignore
+
+                zc, serviceinfo = _mdnsMain(15248, preferred_ip=selected_ip)
 
                 icon.notify("mDNS service started", "RePCC")
             if mdnsActivity.enabled == False: # type: ignore
@@ -831,7 +976,12 @@ def _trayMain():
         mdnsActivity.enabled = False # type: ignore
 
         def toggleWindow():
-            WINDOW.toggle_signal.emit() #type: ignore
+            try:
+                WINDOW.toggle_signal.emit() #type: ignore
+            except:
+                from win11toast import toast
+
+                toast("RePCC Window", "Open fail. Try again")
 
         def quit_app():
             APP.quit() #type: ignore
