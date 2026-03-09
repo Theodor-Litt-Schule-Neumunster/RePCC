@@ -362,7 +362,7 @@ async def repccConnect(request:Request):
             return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)
         
         if not macsYAML["MAC"] == None:
-            if len(macsYAML["MAC"]) == argsYAML["maxSavedMACs"]:
+            if len(macsYAML["MAC"]) == argsYAML["maxSavedMacs"]:
                 print("MAC limit, false.")
                 logger.info("main | Attempted connection denied. Length of saved MACs is at set limit.")
                 return JSONResponse({"error":"Connections are unallowed as of now."}, status_code=405)

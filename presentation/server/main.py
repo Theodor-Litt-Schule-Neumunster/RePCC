@@ -30,9 +30,10 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore
-SLIDE_PROGRESS = 3 # When reconnecting mid slide, client will auto adjust based on this number
+SLIDE_PROGRESS = 0 # When reconnecting mid slide, client will auto adjust based on this number
 
 file_lock = threading.Lock()
+slide_progress_lock = threading.Lock()
 
 REQ_APP = FastAPI(info=True)
 REQ_APP.add_middleware(
@@ -92,6 +93,10 @@ class MainWindow(QMainWindow):
         button_prev = QPushButton("Prev slide")
         button_prev.clicked.connect(lambda: self.nextClientSlide("prev"))
         layout_left.addWidget(button_prev)
+
+        button_shutdown = QPushButton("Shutdown clients")
+        button_shutdown.clicked.connect(self.shutdownClients)
+        layout_left.addWidget(button_shutdown)
 
         layout_left.addStretch(1)
 
@@ -202,7 +207,8 @@ class MainWindow(QMainWindow):
     def _sendFileWorker(self):
 
         global SLIDE_PROGRESS
-        SLIDE_PROGRESS = 0
+        with slide_progress_lock:
+            SLIDE_PROGRESS = 0
         
         try:
             filename = os.path.basename(self.selected_file_path)
@@ -268,6 +274,19 @@ class MainWindow(QMainWindow):
             print(e)
 
     def nextClientSlide(self, direction:str="next"):
+        global SLIDE_PROGRESS
+
+        normalized_direction = (direction or "").strip().lower()
+        with slide_progress_lock:
+            if normalized_direction == "next":
+                SLIDE_PROGRESS += 1
+            elif normalized_direction == "prev":
+                # Slide index cannot go below zero.
+                SLIDE_PROGRESS = max(0, SLIDE_PROGRESS - 1)
+            current_progress = SLIDE_PROGRESS
+
+        addActivity(f"Slide progress is now {current_progress} ({normalized_direction})")
+
         data = None
 
         with file_lock:
@@ -362,6 +381,75 @@ class MainWindow(QMainWindow):
         for t in threads:
             t.join()
 
+        with slide_progress_lock:
+            summary["progress"] = SLIDE_PROGRESS
+
+        return summary
+
+    def shutdownClients(self):
+        data = None
+
+        with file_lock:
+            try:
+                with open(assetsPath("assets/connections.json"), "r") as f:
+                    data = json.load(f)
+                    f.close()
+            except Exception:
+                data = []
+
+        if data is None:
+            data = []
+
+        summary = {
+            "ok": 0,
+            "failed": 0,
+            "targets": 0,
+        }
+
+        summary_lock = threading.Lock()
+        threads = []
+
+        def _send_shutdown(address: str):
+            endpoint = f"http://{address}:11111/shutdown"
+
+            try:
+                response = requests.post(endpoint, timeout=3)
+            except requests.RequestException as e:
+                with summary_lock:
+                    summary["failed"] += 1
+                addActivity(f"!! ERROR! Shutdown request failed for {address}: {e}")
+                return
+
+            if response.status_code == 200:
+                with summary_lock:
+                    summary["ok"] += 1
+                addActivity(f"Shutdown sent to {address}")
+                return
+
+            with summary_lock:
+                summary["failed"] += 1
+            addActivity(f"!! ERROR! Shutdown failed for {address} (code {response.status_code})")
+
+        for i in range(len(data)):
+            subdata = data[i]
+            address = subdata.get("host", None)
+
+            if not address:
+                continue
+
+            with summary_lock:
+                summary["targets"] += 1
+
+            t = threading.Thread(target=_send_shutdown, args=(address,), daemon=True)
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        addActivity(
+            f"Shutdown broadcast finished. targets={summary['targets']} ok={summary['ok']} failed={summary['failed']}"
+        )
         return summary
 
 def addActivity(message:str):
@@ -675,7 +763,9 @@ def _requestsMain():
                 found, _ = findHost(data, request.client.host)
 
                 if found:
-                    return JSONResponse({"progress":SLIDE_PROGRESS}, status_code=200)
+                    with slide_progress_lock:
+                        progress = SLIDE_PROGRESS
+                    return JSONResponse({"progress":progress}, status_code=200)
                 
                 return JSONResponse({"message":"Not allowed"}, status_code=405)
             except Exception as e:
@@ -693,6 +783,16 @@ def _requestsMain():
                 toast(f"RESYNC CLIENT WARNING", "STATUS: {status}")
 
             threading.Thread(target=sendNotification, args=(status, )).start()
+
+        @REQ_APP.post("/present/shutdownclients")
+        async def fapi_shutdown_clients(request:Request):
+            if WINDOW is None:
+                return JSONResponse({"error":"window not ready"}, status_code=503)
+
+            result = WINDOW.shutdownClients()
+            failed = result.get("failed", 0)
+            status = 200 if failed == 0 else 207
+            return JSONResponse(result, status_code=status)
 
     requestInit()
 

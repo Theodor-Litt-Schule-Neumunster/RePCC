@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import socket
+import subprocess
 import qrcode
 import signal
 import shutil
@@ -32,9 +33,12 @@ CLIENTWINDOW = None
 MDNS_ENABLED = False
 PING_SUCCESS = None
 SERVER_IP = None
+APP_INSTANCE = None
 
 SLIDE_PROGRESS = 0
 SLIDE_PROGRESS_LOCK = threading.Lock()
+
+CREATE_NO_WINDOW = 0x08000000
 
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore
 
@@ -55,6 +59,44 @@ def assetsPath(relativepath:str):
     """
     basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(basepath, relativepath)
+
+def schedule_pc_shutdown(reason: str = "remote request"):
+    def _shutdown_worker():
+        print(f"PC shutdown requested ({reason}).")
+
+        # Give the HTTP response a moment to return before initiating shutdown.
+        time.sleep(0.25)
+
+        if os.name != "nt":
+            print("Non-Windows OS detected. Falling back to app exit.")
+            try:
+                if APP_INSTANCE is not None:
+                    APP_INSTANCE.quit()
+            finally:
+                os._exit(0)
+
+        try:
+            subprocess.Popen(
+                ["shutdown", "/s", "/f", "/t", "5"],
+                creationflags=CREATE_NO_WINDOW,
+            )
+        except Exception as e:
+            print(f"Windows shutdown command failed: {e}")
+            return
+
+        try:
+            if CLIENTWINDOW is not None:
+                CLIENTWINDOW.close()
+        except Exception:
+            pass
+
+        try:
+            if APP_INSTANCE is not None:
+                APP_INSTANCE.quit()
+        except Exception:
+            pass
+
+    threading.Thread(target=_shutdown_worker, daemon=True).start()
 
 class ClientWindow(QWidget):
     toggle_signal = pyqtSignal()
@@ -463,6 +505,16 @@ def _httpMain():
             print(f"/prev error: {e}")
             return JSONResponse({"error": "failed to send prev input"}, status_code=500)
 
+    @FAPI.post("/shutdown")
+    async def FAPI_shutdown(request: Request):
+        host = request.client.host if request.client else "unknown"
+        schedule_pc_shutdown(f"server {host}")
+        return JSONResponse({"message": "pc shutdown scheduled"}, status_code=200)
+
+    @FAPI.get("/shutdown")
+    async def FAPI_shutdown_get(request: Request):
+        return await FAPI_shutdown(request)
+
 # TODO:
 # - check if connection stays, if not: reopen ZC (Done? idrk atp)
 
@@ -480,6 +532,7 @@ if __name__ == "__main__":
     
     _httpMain()
     app = QApplication(sys.argv)
+    APP_INSTANCE = app
     app.setQuitOnLastWindowClosed(False)
 
     def signal_handler(sig, frame):
