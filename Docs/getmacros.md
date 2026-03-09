@@ -60,3 +60,54 @@ body = {
     "METHOD": "CHECK"
 }
 ```
+
+---
+## Macro Ausfuehren
+
+Zum Starten eines gespeicherten Macros gibt es die Request `/macro/run/{name}`.
+
+Die Request ist ein `GET` und benoetigt keinen Body.
+
+Beispiel:
+```text
+http://127.0.0.1:15248/macro/run/mouseMove
+```
+
+Hinweise:
+- Der Name kann mit oder ohne `.pcmac` angegeben werden.
+- Wenn keine Extension angegeben ist, wird serverseitig automatisch `.pcmac` angehaengt.
+- Das Macro wird im Backend in einem eigenen Thread gestartet (die Request wartet nicht auf das Ende der Ausfuehrung).
+
+Moegliche Antworten:
+- `200` (`OK`)
+```json
+{
+    "message": "Great success!"
+}
+```
+- `400` (`BAD REQUEST`)
+```json
+{
+    "error": "Macro structure is not ok"
+}
+```
+- `404` (`NOT FOUND`)
+```json
+{
+    "error": "Macro does not exist"
+}
+```
+- `405` (`METHOD NOT ALLOWED`)
+```json
+{
+    "error": "Not allowed"
+}
+```
+`405` wird zurueckgegeben, wenn der Host nicht registriert/freigegeben ist.
+
+- `500` (`INTERNAL SERVER ERROR`)
+```json
+{
+    "error": "Fail inside macros_run"
+}
+```
