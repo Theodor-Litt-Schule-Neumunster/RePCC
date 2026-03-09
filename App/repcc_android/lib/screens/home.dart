@@ -14,6 +14,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   // List of devices managed by the state - now starts empty
   List<Device> devices = [];
   bool isGridStyle = false;
@@ -34,11 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
         request.headers.set(HttpHeaders.acceptHeader, 'application/json');
         final response = await request.close().timeout(
-          const Duration(milliseconds: 1500),
-        );
+              const Duration(milliseconds: 1500),
+            );
 
         final responseBody = await response.transform(utf8.decoder).join();
-        final isStatusOk = response.statusCode == 200 || response.statusCode == 202;
+        final isStatusOk =
+            response.statusCode == 200 || response.statusCode == 202;
         final isRepccPayload = responseBody.contains('"message":"Success"') ||
             responseBody.contains('"message": "Success"');
 
@@ -77,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const String appTitle = 'RePCC';
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
+      key: _scaffoldKey,
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -92,8 +96,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: IconButton(
                       icon: SvgPicture.asset(
                         'assets/Icons/close.svg',
-                        colorFilter:
-                            ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+                        colorFilter: ColorFilter.mode(
+                            colorScheme.onTertiary, BlendMode.srcIn),
                         width: 24,
                         height: 24,
                       ),
@@ -104,7 +108,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SvgPicture.asset('assets/repcclogo.svg', width: 64, height: 64),
+                        SvgPicture.asset('assets/repcclogo.svg',
+                            width: 64, height: 64),
                         const SizedBox(height: 10),
                         Text(
                           appTitle,
@@ -122,20 +127,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: SvgPicture.asset('assets/Icons/home.svg',
-                  colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
+                  colorFilter:
+                      ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
                   width: 24,
                   height: 24),
-              title: Text('Home', style: TextStyle(color: colorScheme.onSurface)),
+              title:
+                  Text('Home', style: TextStyle(color: colorScheme.onSurface)),
               onTap: () {
                 Navigator.pop(context);
               },
             ),
             ListTile(
               leading: SvgPicture.asset('assets/Icons/connect.svg',
-                  colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
+                  colorFilter:
+                      ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
                   width: 24,
                   height: 24),
-              title: Text('Connect', style: TextStyle(color: colorScheme.onSurface)),
+              title: Text('Connect',
+                  style: TextStyle(color: colorScheme.onSurface)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context,
@@ -146,6 +155,17 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       appBar: AppBar(
+        leading: IconButton(
+          icon: SvgPicture.asset(
+            'assets/Icons/menu.svg',
+            colorFilter:
+                ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+            width: 24,
+            height: 24,
+          ),
+          tooltip: 'Open navigation menu',
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
         title: Center(
             child: Text(
           appTitle,
@@ -164,8 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   )
                 : SvgPicture.asset(
                     'assets/Icons/sync.svg',
-                    colorFilter:
-                        ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+                    colorFilter: ColorFilter.mode(
+                        colorScheme.onTertiary, BlendMode.srcIn),
                     width: 24,
                     height: 24,
                   ),
@@ -175,7 +195,8 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: SvgPicture.asset(
               isGridStyle ? 'assets/Icons/list.svg' : 'assets/Icons/grid.svg',
-              colorFilter: ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+              colorFilter:
+                  ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
               width: 24,
               height: 24,
             ),
@@ -188,7 +209,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: SvgPicture.asset('assets/Icons/info.svg',
-                colorFilter: ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+                colorFilter:
+                    ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
                 width: 24,
                 height: 24),
             onPressed: () {
@@ -217,7 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 'Added Devices',
                 style: TextStyle(
-                  color: colorScheme.onSurface,
+                    color: colorScheme.onSurface,
                     fontSize: 24,
                     fontFamily: 'JetBrainsMono'),
               ),
@@ -281,12 +303,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const MacroScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const MacroScreen()),
                     );
                   },
                   icon: SvgPicture.asset(
                     'assets/Icons/keyboard.svg',
-                    colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                    colorFilter:
+                        const ColorFilter.mode(Colors.black, BlendMode.srcIn),
                     width: 24,
                     height: 24,
                   ),
@@ -307,7 +331,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
 
                     if (newDevice != null && newDevice is Device) {
-                      newDevice.isConnected = await _checkDeviceConnectivity(newDevice);
+                      newDevice.isConnected =
+                          await _checkDeviceConnectivity(newDevice);
                       setState(() {
                         devices.add(newDevice);
                       });
@@ -315,7 +340,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   icon: SvgPicture.asset(
                     'assets/Icons/add.svg',
-                    colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                    colorFilter:
+                        const ColorFilter.mode(Colors.black, BlendMode.srcIn),
                     width: 24,
                     height: 24,
                   ),
@@ -341,7 +367,7 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 24,
         ),
         title: Text(
-          device.name,
+          device.name.replaceAll(RegExp(r'\.local$'), ''),
           style: TextStyle(
               color: colorScheme.onSurface,
               fontFamily: 'JetBrainsMono',
@@ -353,7 +379,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Text.rich(
               TextSpan(
                 text: 'Status: ',
-                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12),
+                style: TextStyle(
+                    color: colorScheme.onSurface.withOpacity(0.7),
+                    fontSize: 12),
                 children: [
                   TextSpan(
                     text: device.isConnected ? 'Reachable' : 'Unreachable',
@@ -393,7 +421,8 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: onDelete,
           icon: SvgPicture.asset(
             'assets/Icons/delete.svg',
-            colorFilter: ColorFilter.mode(colorScheme.onSurface.withOpacity(0.7), BlendMode.srcIn),
+            colorFilter: ColorFilter.mode(
+                colorScheme.onSurface.withOpacity(0.7), BlendMode.srcIn),
             width: 24,
             height: 24,
           ),
@@ -415,18 +444,20 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 SvgPicture.asset(
                   'assets/Icons/computer.svg',
-                  colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
+                  colorFilter:
+                      ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
                   width: 20,
                   height: 20,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    device.name,
+                    device.name.replaceAll(RegExp(r'\.local$'), ''),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: colorScheme.onSurface, fontFamily: 'JetBrainsMono'),
+                        color: colorScheme.onSurface,
+                        fontFamily: 'JetBrainsMono'),
                   ),
                 ),
                 IconButton(
@@ -434,7 +465,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: SvgPicture.asset(
                     'assets/Icons/delete.svg',
                     colorFilter: ColorFilter.mode(
-                        colorScheme.onSurface.withOpacity(0.7), BlendMode.srcIn),
+                        colorScheme.onSurface.withOpacity(0.7),
+                        BlendMode.srcIn),
                     width: 18,
                     height: 18,
                   ),
