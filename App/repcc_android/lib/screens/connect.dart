@@ -18,6 +18,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final List<Device> _discoveredDevices = [];
   bool _isScanning = false;
   String _statusMessage = 'Press scan to discover devices';
+  final bool _enableMdnsLogging = true;
+
+  void _logMdns(String message) {
+    if (!_enableMdnsLogging) return;
+    debugPrint('[mDNS] $message');
+  }
 
   Future<List<InternetAddress>> _getActiveNetworkAddresses() async {
     final interfaces = await NetworkInterface.list(
@@ -53,21 +59,17 @@ class _ConnectScreenState extends State<ConnectScreen> {
     return false;
   }
 
-  bool _isSameSubnet24(String firstIp, String secondIp) {
-    final firstParts = firstIp.split('.');
-    final secondParts = secondIp.split('.');
-    if (firstParts.length != 4 || secondParts.length != 4) return false;
-    return firstParts[0] == secondParts[0] &&
-        firstParts[1] == secondParts[1] &&
-        firstParts[2] == secondParts[2];
-  }
-
   bool _belongsToActiveNetwork(
       String discoveredIp, List<InternetAddress> localAddresses) {
     if (!_isUsableNetworkIp(discoveredIp)) return false;
-    if (localAddresses.isEmpty) return true;
-    return localAddresses
-        .any((local) => _isSameSubnet24(discoveredIp, local.address));
+    return true;
+  }
+
+  Iterable<String> _txtEntries(String text) {
+    return text
+        .split(RegExp(r'[\n;,]+'))
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty);
   }
 
   int? _extractSocketErrorCode(Object error) {
@@ -104,21 +106,35 @@ class _ConnectScreenState extends State<ConnectScreen> {
       _discoveredDevices.clear();
     });
 
+    MDnsClient? client;
+
     try {
       final String serviceType = '_repcc._tcp.local.';
-      final MDnsClient client = MDnsClient();
+      client = MDnsClient();
       final localNetworkAddresses = await _getActiveNetworkAddresses();
 
+      _logMdns('Starting scan for service type "$serviceType"');
+      _logMdns(
+          'Active local IPv4 addresses: ${localNetworkAddresses.map((a) => a.address).join(', ')}');
+
       await client.start();
+      _logMdns('mDNS client started');
 
       await for (final PtrResourceRecord ptr
           in client.lookup<PtrResourceRecord>(
         ResourceRecordQuery.serverPointer(serviceType),
       )) {
+        _logMdns('PTR found: ${ptr.domainName}');
+
         await for (final SrvResourceRecord srv
             in client.lookup<SrvResourceRecord>(
           ResourceRecordQuery.service(ptr.domainName),
         )) {
+          _logMdns(
+              'SRV found: target=${srv.target}, port=${srv.port}, priority=${srv.priority}, weight=${srv.weight}');
+
+          final normalizedTarget = srv.target.replaceFirst(RegExp(r'\.$'), '');
+
           // Get the IP address
           String? ipAddress;
           await for (final IPAddressResourceRecord ip
@@ -126,7 +142,25 @@ class _ConnectScreenState extends State<ConnectScreen> {
             ResourceRecordQuery.addressIPv4(srv.target),
           )) {
             ipAddress = ip.address.address;
+            _logMdns('A record found for ${srv.target}: $ipAddress');
             break;
+          }
+
+          if (ipAddress == null && normalizedTarget != srv.target) {
+            await for (final IPAddressResourceRecord ip
+                in client.lookup<IPAddressResourceRecord>(
+              ResourceRecordQuery.addressIPv4(normalizedTarget),
+            )) {
+              ipAddress = ip.address.address;
+              _logMdns(
+                  'A record fallback found for $normalizedTarget: $ipAddress');
+              break;
+            }
+          }
+
+          if (ipAddress == null) {
+            _logMdns('No IPv4 A record found for ${srv.target}; skipping');
+            continue;
           }
 
           // Get TXT records for additional info (MAC address, ports)
@@ -137,8 +171,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
               in client.lookup<TxtResourceRecord>(
             ResourceRecordQuery.text(ptr.domainName),
           )) {
-            // Split the text by newline to get individual entries
-            for (final String entry in txt.text.split('\n')) {
+            _logMdns('TXT found for ${ptr.domainName}: ${txt.text}');
+
+            for (final String entry in _txtEntries(txt.text)) {
               if (entry.startsWith('mac=')) {
                 macAddress = entry.substring(4);
               } else if (entry.startsWith('ports=')) {
@@ -153,11 +188,14 @@ class _ConnectScreenState extends State<ConnectScreen> {
             break;
           }
 
+          _logMdns(
+              'Parsed TXT data for ${srv.target}: mac=$macAddress, ports=$ports');
+
           if (ipAddress != null &&
               _belongsToActiveNetwork(ipAddress, localNetworkAddresses)) {
             final device = Device(
               id: ipAddress,
-              name: srv.target.replaceAll(RegExp(r'\.local$'), ''),
+              name: normalizedTarget.replaceAll(RegExp(r'\.local\.?$'), ''),
               ipAddress: ipAddress,
               macAddress: macAddress,
               ports: ports.isNotEmpty ? ports : [8080],
@@ -168,13 +206,18 @@ class _ConnectScreenState extends State<ConnectScreen> {
             setState(() {
               if (!_discoveredDevices.any((d) => d.id == device.id)) {
                 _discoveredDevices.add(device);
+                _logMdns(
+                    'Device accepted: name=${device.name}, ip=${device.ipAddress}, mac=${device.macAddress}, ports=${device.ports.join(', ')}');
+              } else {
+                _logMdns('Duplicate device ignored for ip=${device.ipAddress}');
               }
             });
+          } else {
+            _logMdns(
+                'Device filtered out (not in active network): ip=$ipAddress, local=${localNetworkAddresses.map((a) => a.address).join(', ')}');
           }
         }
       }
-
-      client.stop();
 
       if (!mounted) return;
       setState(() {
@@ -185,12 +228,24 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 : 'No devices found in your current network.')
             : 'Found ${_discoveredDevices.length} device(s)';
       });
+
+      _logMdns('Scan finished. Found ${_discoveredDevices.length} device(s).');
     } catch (e) {
+      _logMdns('Scan error: $e');
       if (!mounted) return;
       setState(() {
         _isScanning = false;
         _statusMessage = _scanErrorMessage(e);
       });
+    } finally {
+      if (client != null) {
+        try {
+          client.stop();
+          _logMdns('mDNS client stopped');
+        } catch (stopError) {
+          _logMdns('Error while stopping mDNS client: $stopError');
+        }
+      }
     }
   }
 
