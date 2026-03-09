@@ -59,7 +59,8 @@ class _MacroScreenState extends State<MacroScreen> {
                   maxLines: 10,
                   decoration: const InputDecoration(
                     labelText: 'Macro JSON / Body',
-                    hintText: 'Paste your .pcmac JSON here (or any text for now)',
+                    hintText:
+                        'Paste your .pcmac JSON here (or any text for now)',
                   ),
                 ),
               ],
@@ -152,6 +153,16 @@ class _MacroScreenState extends State<MacroScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: SvgPicture.asset(
+            'assets/Icons/home.svg',
+            colorFilter:
+                ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+            width: 24,
+            height: 24,
+          ),
+        ),
         title: const Text('Macros'),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -171,7 +182,8 @@ class _MacroScreenState extends State<MacroScreen> {
                   child: Text(
                     'No macros yet.\nTap “Add Macro” to create one.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+                    style: TextStyle(
+                        color: colorScheme.onSurface.withOpacity(0.7)),
                   ),
                 )
               : ListView.builder(
@@ -195,7 +207,8 @@ class _MacroScreenState extends State<MacroScreen> {
                               : macro.body.trim().split('\n').first,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: colorScheme.onTertiary.withOpacity(0.6)),
+                          style: TextStyle(
+                              color: colorScheme.onTertiary.withOpacity(0.6)),
                         ),
                         onTap: () => _upsertMacro(existing: macro),
                         trailing: IconButton(
@@ -203,7 +216,8 @@ class _MacroScreenState extends State<MacroScreen> {
                           icon: SvgPicture.asset(
                             'assets/Icons/delete.svg',
                             colorFilter: ColorFilter.mode(
-                                colorScheme.onTertiary.withOpacity(0.7), BlendMode.srcIn),
+                                colorScheme.onTertiary.withOpacity(0.7),
+                                BlendMode.srcIn),
                             width: 22,
                             height: 22,
                           ),
