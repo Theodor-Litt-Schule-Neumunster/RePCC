@@ -5,7 +5,6 @@ import os
 import sys
 import json
 import time
-import shutil
 import socket
 import ipaddress
 import pystray
@@ -31,6 +30,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore
+SLIDE_PROGRESS = 3 # When reconnecting mid slide, client will auto adjust based on this number
 
 file_lock = threading.Lock()
 
@@ -200,6 +200,9 @@ class MainWindow(QMainWindow):
         threading.Thread(target=self._sendFileWorker, daemon=True).start()
 
     def _sendFileWorker(self):
+
+        global SLIDE_PROGRESS
+        SLIDE_PROGRESS = 0
         
         try:
             filename = os.path.basename(self.selected_file_path)
@@ -476,6 +479,19 @@ def _requestsMain():
 
         return found, key_i
 
+    def removeHostEntries(data:list, host:str):
+        """
+        Remove all entries for a specific host from the in-memory connection list.
+        Returns the updated list and number of removed entries.
+        """
+
+        if not isinstance(data, list):
+            return [], 0
+
+        filtered = [entry for entry in data if entry.get("host", None) != host]
+        removed_count = len(data) - len(filtered)
+        return filtered, removed_count
+
     def timeoutHandler(timeoutSeconds:int):
         """
         loops through the connected devices inside the JSON and checks the lastupdate key.
@@ -547,7 +563,8 @@ def _requestsMain():
                 if not type(data) == list:
                     data = []
 
-                found, i = findHost(data, request.client.host) # type: ignore
+                client_host = request.client.host  # type: ignore
+                found, i = findHost(data, client_host)
                 if found:
                     data[i]["lastupdate"] = datetime.datetime.now().timestamp() # type: ignore
 
@@ -556,8 +573,17 @@ def _requestsMain():
                             json.dump(data, f, indent=5)
                             f.close()
                     return JSONResponse({}, status_code=200)
-                
-                return JSONResponse({}, status_code=403)
+
+                # Defensive cleanup: ensure unauthorized ping hosts are not kept in the registry.
+                cleaned_data, removed_count = removeHostEntries(data, client_host)
+                if removed_count > 0:
+                    with file_lock:
+                        with open(assetsPath("assets/connections.json"), "w") as f:
+                            json.dump(cleaned_data, f, indent=5)
+                            f.close()
+                    addActivity(f"Removed {client_host} from connections after ping returned 405")
+
+                return JSONResponse({}, status_code=405)
                     
             except Exception as e:
                 
@@ -635,6 +661,38 @@ def _requestsMain():
             failed = result.get("failed", 0)
             status = 200 if failed == 0 else 207
             return JSONResponse(result, status_code=status)
+
+        @REQ_APP.get("/present/getprogress")
+        async def fapi_present_progress(request:Request):
+            addActivity(f"{request.client.host} requested current slide progress.")
+            try:
+                data = None
+                with file_lock:
+                    with open(assetsPath("assets/connections.json"), "r") as f:
+                        data = json.load(f)
+                        f.close()
+
+                found, _ = findHost(data, request.client.host)
+
+                if found:
+                    return JSONResponse({"progress":SLIDE_PROGRESS}, status_code=200)
+                
+                return JSONResponse({"message":"Not allowed"}, status_code=405)
+            except Exception as e:
+                print(f"fapi present progress {e}")
+                return JSONResponse({"error":"fapi_resent_progress error, check print"}, status_code=405)
+
+        @REQ_APP.get("/notify/resync/{status}")
+        async def fapi_notify_resync(request:Request, status:str):
+            
+            from win11toast import toast
+
+            addActivity(f"Client resync notification. {status}")
+
+            def sendNotification(status:str):
+                toast(f"RESYNC CLIENT WARNING", "STATUS: {status}")
+
+            threading.Thread(target=sendNotification, args=(status, )).start()
 
     requestInit()
 

@@ -1,3 +1,6 @@
+# pyinstaller --noconfirm --onefile --noconsole --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
+# pyinstaller --noconfirm --onefile --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
+
 import os
 import sys
 import time
@@ -29,6 +32,9 @@ CLIENTWINDOW = None
 MDNS_ENABLED = False
 PING_SUCCESS = None
 SERVER_IP = None
+
+SLIDE_PROGRESS = 0
+SLIDE_PROGRESS_LOCK = threading.Lock()
 
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming" # type: ignore
 
@@ -212,6 +218,68 @@ def _mdnsMain():
 
             global MDNS_ENABLED, SERVER_IP
 
+            def resyncProgress(newProgress:int):
+                global SLIDE_PROGRESS, SERVER_IP
+
+                with SLIDE_PROGRESS_LOCK:
+                    old_progress = SLIDE_PROGRESS
+
+                if newProgress < 0:
+                    newProgress = 0
+
+                difference = newProgress - old_progress
+                if difference == 0:
+                    print("ReSync not needed, progress already matches.")
+                    return
+
+                direction = "right" if difference > 0 else "left"
+                steps = abs(difference)
+
+                print(
+                    f"ReSync from {old_progress} to {newProgress} ({steps} steps {direction})."
+                )
+
+                try:
+                    if SERVER_IP:
+                        requests.get(
+                            f"http://{SERVER_IP}:{api_port}/notify/resync/start",
+                            timeout=(1, 2),
+                        )
+                except requests.RequestException:
+                    pass
+
+                try:
+                    for _ in range(steps):
+                        try:
+                            pyautogui.press(direction)
+                        except pyautogui.FailSafeException as e:
+                            print(f"ReSync aborted by fail-safe: {e}")
+                            return
+                        except Exception as e:
+                            print(f"ReSync input error: {e}")
+                            return
+
+                        with SLIDE_PROGRESS_LOCK:
+                            if direction == "right":
+                                SLIDE_PROGRESS += 1
+                            else:
+                                SLIDE_PROGRESS = max(0, SLIDE_PROGRESS - 1)
+
+                        time.sleep(2.5)
+                finally:
+                    try:
+                        if SERVER_IP:
+                            requests.get(
+                                f"http://{SERVER_IP}:{api_port}/notify/resync/end",
+                                timeout=(1, 2),
+                            )
+                    except requests.RequestException:
+                        pass
+
+                print(f"ReSync done. Local progress={SLIDE_PROGRESS}")
+
+            
+
             try:
                 info = zc.get_service_info(type_, name)
             finally:
@@ -262,7 +330,7 @@ def _mdnsMain():
                 print(f"Candidate server IPs: {candidate_ips} (api_port={api_port})")
 
                 def _connect_worker():
-                    global MDNS_ENABLED, SERVER_IP
+                    global MDNS_ENABLED, SERVER_IP, SLIDE_PROGRESS
 
                     try:
                         while True:
@@ -287,6 +355,35 @@ def _mdnsMain():
                                     zeroconf.close() # type: ignore
                                     MDNS_ENABLED = False
                                     print(f"Connected to server on {ip}:{api_port}")
+
+                                    print("Checking slide progress...")
+                                    try:
+                                        r = requests.get(
+                                            f"http://{ip}:{api_port}/present/getprogress",
+                                            timeout=(1, 2),
+                                        )
+
+                                        if r.status_code == 200:
+                                            body = r.json()
+                                            progress = body.get("progress")
+
+                                            if progress is not None:
+                                                progress = int(progress)
+
+                                                with SLIDE_PROGRESS_LOCK:
+                                                    local_progress = SLIDE_PROGRESS
+
+                                                if local_progress == progress:
+                                                    print("Same progress.")
+                                                    return
+                                                else:
+                                                    resyncProgress(progress)
+                                                    print("ReSync end.")
+                                                    return
+
+                                    except requests.RequestException:
+                                        print("Request for progress failed.")
+                                        continue
                                     return
 
                             print("Connection failed for all advertised IPs, retrying...")
@@ -334,8 +431,13 @@ def _httpMain():
 
     @FAPI.get("/next")
     async def FAPI_next():
+        global SLIDE_PROGRESS
         try:
             pyautogui.press("right")
+
+            with SLIDE_PROGRESS_LOCK:
+                SLIDE_PROGRESS += 1
+
             return JSONResponse({}, status_code=200)
         except pyautogui.FailSafeException as e:
             print(f"failsafe on /next: {e}")
@@ -346,8 +448,13 @@ def _httpMain():
 
     @FAPI.get("/prev")
     async def FAPI_prev():
+        global SLIDE_PROGRESS
         try:
             pyautogui.press("left")
+
+            with SLIDE_PROGRESS_LOCK:
+                SLIDE_PROGRESS = max(0, SLIDE_PROGRESS - 1)
+
             return JSONResponse({}, status_code=200)
         except pyautogui.FailSafeException as e:
             print(f"failsafe on /prev: {e}")
