@@ -5,6 +5,8 @@ import 'package:multicast_dns/multicast_dns.dart';
 import 'dart:async';
 import 'dart:io';
 
+// TODO: Send pings every 10s to enable connection status updates (ping on connect, then start timer that pings every 10s, cancel on disconnect)
+
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});
 
