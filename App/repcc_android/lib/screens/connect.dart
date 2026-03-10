@@ -216,8 +216,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
           _logMdns(
               'Parsed TXT data for ${srv.target}: mac=$macAddress, ports=$ports');
 
-          if (ipAddress != null &&
-              _belongsToActiveNetwork(ipAddress, localNetworkAddresses)) {
+          if (_belongsToActiveNetwork(ipAddress, localNetworkAddresses)) {
             final device = Device(
               id: ipAddress,
               name: normalizedTarget.replaceAll(RegExp(r'\.local\.?$'), ''),
