@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../models/device.dart';
@@ -27,12 +28,22 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final port in portsToCheck) {
       HttpClient? client;
       try {
+        final host = device.ipAddress.trim();
+        if (host.isEmpty) {
+          continue;
+        }
+
+        final uri = Uri(
+          scheme: 'http',
+          host: host,
+          port: port,
+          path: '/ping',
+        );
+
         client = HttpClient()
           ..connectionTimeout = const Duration(milliseconds: 1200);
 
-        final request = await client.getUrl(
-          Uri.parse('http://${device.ipAddress}:$port/ping'),
-        );
+        final request = await client.getUrl(uri);
 
         request.headers.set(HttpHeaders.acceptHeader, 'application/json');
         final response = await request.close().timeout(
@@ -330,12 +341,32 @@ class _HomeScreenState extends State<HomeScreen> {
                       MaterialPageRoute(builder: (context) => ConnectScreen()),
                     );
 
+                    if (!mounted) return;
+
                     if (newDevice != null && newDevice is Device) {
-                      newDevice.isConnected =
-                          await _checkDeviceConnectivity(newDevice);
-                      setState(() {
-                        devices.add(newDevice);
-                      });
+                      try {
+                        newDevice.isConnected =
+                            await _checkDeviceConnectivity(newDevice);
+                        if (!mounted) return;
+                        setState(() {
+                          devices.add(newDevice);
+                        });
+                      } catch (error, stackTrace) {
+                        if (kDebugMode) {
+                          debugPrint('Add device flow failed: $error');
+                          debugPrintStack(stackTrace: stackTrace);
+                        }
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              kDebugMode
+                                  ? 'Failed to add device: ${error.toString()}'
+                                  : 'Failed to add device. Please try again.',
+                            ),
+                          ),
+                        );
+                      }
                     }
                   },
                   icon: SvgPicture.asset(

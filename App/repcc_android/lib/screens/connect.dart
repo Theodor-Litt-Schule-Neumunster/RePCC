@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/device.dart';
 import 'package:multicast_dns/multicast_dns.dart';
@@ -15,6 +17,7 @@ class ConnectScreen extends StatefulWidget {
 }
 
 class _ConnectScreenState extends State<ConnectScreen> {
+  static const MethodChannel _networkChannel = MethodChannel('repcc/network');
   final List<Device> _discoveredDevices = [];
   bool _isScanning = false;
   String _statusMessage = 'Press scan to discover devices';
@@ -23,6 +26,27 @@ class _ConnectScreenState extends State<ConnectScreen> {
   void _logMdns(String message) {
     if (!_enableMdnsLogging) return;
     debugPrint('[mDNS] $message');
+  }
+
+  Future<void> _acquireAndroidMulticastLock() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final acquired =
+          await _networkChannel.invokeMethod<bool>('acquireMulticastLock');
+      _logMdns('Android multicast lock acquired: ${acquired == true}');
+    } catch (e) {
+      _logMdns('Failed to acquire Android multicast lock: $e');
+    }
+  }
+
+  Future<void> _releaseAndroidMulticastLock() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _networkChannel.invokeMethod<bool>('releaseMulticastLock');
+      _logMdns('Android multicast lock released');
+    } catch (e) {
+      _logMdns('Failed to release Android multicast lock: $e');
+    }
   }
 
   Future<List<InternetAddress>> _getActiveNetworkAddresses() async {
@@ -117,6 +141,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       _logMdns(
           'Active local IPv4 addresses: ${localNetworkAddresses.map((a) => a.address).join(', ')}');
 
+      await _acquireAndroidMulticastLock();
       await client.start();
       _logMdns('mDNS client started');
 
@@ -246,11 +271,64 @@ class _ConnectScreenState extends State<ConnectScreen> {
           _logMdns('Error while stopping mDNS client: $stopError');
         }
       }
+      await _releaseAndroidMulticastLock();
     }
+  }
+
+  @override
+  void dispose() {
+    _releaseAndroidMulticastLock();
+    super.dispose();
   }
 
   void _selectDevice(Device device) {
     Navigator.pop(context, device);
+  }
+
+  bool _isValidHostname(String value) {
+    // Accept simple LAN hostnames like "office-pc" or "office-pc.local".
+    final hostnameRegex = RegExp(
+      r'^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$',
+    );
+    return hostnameRegex.hasMatch(value);
+  }
+
+  bool _isValidIpv4(String value) {
+    final parts = value.split('.');
+    if (parts.length != 4) return false;
+    for (final part in parts) {
+      final segment = int.tryParse(part);
+      if (segment == null || segment < 0 || segment > 255) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  ({String host, int? port})? _parseManualAddress(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return null;
+
+    // Supports "host" and "host:port" (IPv4 or hostname).
+    final separatorIndex = trimmed.lastIndexOf(':');
+    if (separatorIndex > 0 && separatorIndex < trimmed.length - 1) {
+      final host = trimmed.substring(0, separatorIndex).trim();
+      final portRaw = trimmed.substring(separatorIndex + 1).trim();
+      final port = int.tryParse(portRaw);
+      if (port == null || port < 1 || port > 65535) {
+        return null;
+      }
+      if (!_isValidIpv4(host) && !_isValidHostname(host)) {
+        return null;
+      }
+      return (host: host, port: port);
+    }
+
+    if (!_isValidIpv4(trimmed) && !_isValidHostname(trimmed)) {
+      return null;
+    }
+
+    return (host: trimmed, port: null);
   }
 
   Future<void> _showManualAddDialog() async {
@@ -295,21 +373,50 @@ class _ConnectScreenState extends State<ConnectScreen> {
           ),
           FilledButton.icon(
             onPressed: () {
-              final name = nameController.text.trim();
-              final ipAddress = ipController.text.trim();
-              if (name.isEmpty || ipAddress.isEmpty) return;
+              try {
+                final name = nameController.text.trim();
+                final rawAddress = ipController.text.trim();
+                if (name.isEmpty || rawAddress.isEmpty) return;
 
-              Navigator.pop(
-                dialogContext,
-                Device(
-                  id: ipAddress,
-                  name: name,
-                  ipAddress: ipAddress,
-                  macAddress: 'Unknown',
-                  ports: [8080],
-                  isConnected: false,
-                ),
-              );
+                final parsedAddress = _parseManualAddress(rawAddress);
+                if (parsedAddress == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'Enter a valid IPv4/hostname, optionally with :port.'),
+                    ),
+                  );
+                  return;
+                }
+
+                final ports = <int>[parsedAddress.port ?? 8080];
+
+                Navigator.pop(
+                  dialogContext,
+                  Device(
+                    id: parsedAddress.host,
+                    name: name,
+                    ipAddress: parsedAddress.host,
+                    macAddress: 'Unknown',
+                    ports: ports,
+                    isConnected: false,
+                  ),
+                );
+              } catch (error, stackTrace) {
+                if (kDebugMode) {
+                  debugPrint('Manual add failed: $error');
+                  debugPrintStack(stackTrace: stackTrace);
+                }
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      kDebugMode
+                          ? 'Manual add failed: ${error.toString()}'
+                          : 'Manual add failed. Please check your input.',
+                    ),
+                  ),
+                );
+              }
             },
             icon: SvgPicture.asset(
               'assets/Icons/add.svg',
@@ -328,7 +435,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     ipController.dispose();
 
     if (newDevice == null || !mounted) return;
-    Navigator.pop(context, newDevice);
+    _selectDevice(newDevice);
   }
 
   @override

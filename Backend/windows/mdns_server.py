@@ -7,18 +7,61 @@ so that the RePCC Android app can discover it.
 from zeroconf import ServiceInfo, Zeroconf
 import socket
 import uuid
+import os
 
 def get_local_ip():
-    """Get the local IP address of the machine"""
+    """Get a LAN-reachable IPv4 for mDNS advertisement."""
+
+    forced_ip = os.getenv("REPCC_MDNS_IP", "").strip()
+    if forced_ip:
+        return forced_ip
+
+    def is_usable(ip: str) -> bool:
+        if ip == "127.0.0.1":
+            return False
+        if ip.startswith("169.254."):
+            return False
+        return True
+
+    def is_preferred_private(ip: str) -> bool:
+        return (
+            ip.startswith("192.168.")
+            or ip.startswith("10.")
+            or (ip.startswith("172.") and len(ip.split(".")) > 1 and 16 <= int(ip.split(".")[1]) <= 31)
+        )
+
+    candidates = []
+
     try:
-        # Create a socket to determine the local IP
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-        return local_ip
+        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+        for _, _, _, _, sockaddr in infos:
+            ip = sockaddr[0]
+            if is_usable(ip) and ip not in candidates:
+                candidates.append(ip)
     except Exception:
-        return "127.0.0.1"
+        pass
+
+    # Ask routing table for outbound interface without sending traffic.
+    for target in (("10.255.255.255", 1), ("8.8.8.8", 80)):
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.connect(target)
+            ip = sock.getsockname()[0]
+            if is_usable(ip) and ip not in candidates:
+                candidates.append(ip)
+        except Exception:
+            pass
+        finally:
+            if sock:
+                sock.close()
+
+    preferred = [ip for ip in candidates if is_preferred_private(ip)]
+    if preferred:
+        return preferred[0]
+    if candidates:
+        return candidates[0]
+    return "127.0.0.1"
 
 def get_mac_address():
     """Get the MAC address of the machine"""
@@ -59,6 +102,7 @@ def register_mdns_service():
     print(f"Registering mDNS service...")
     print(f"  Service Name: {service_name}")
     print(f"  IP Address: {local_ip}")
+    print("  Tip: set REPCC_MDNS_IP=<your LAN IPv4> to force advertised address")
     print(f"  MAC Address: {mac_address}")
     print(f"  Port: {port}")
     print(f"  Additional Ports: 8080, 8081")
