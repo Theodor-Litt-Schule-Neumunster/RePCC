@@ -133,7 +133,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     MDnsClient? client;
 
     try {
-      final String serviceType = '_repcc._tcp.local.';
+      final String serviceType = '_repcc._tcp.local';
       client = MDnsClient();
       final localNetworkAddresses = await _getActiveNetworkAddresses();
 
