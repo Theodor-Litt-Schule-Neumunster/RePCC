@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:repcc_android/screens/home.dart';
+import 'dart:ui';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 /* Primary color scheme for the app */
 
@@ -18,6 +21,29 @@ final ColorScheme repccMain = ColorScheme (
 );
 
 void main() {
+  if (kDebugMode) {
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('FlutterError: ${details.exceptionAsString()}');
+      debugPrintStack(stackTrace: details.stack);
+    };
+
+    PlatformDispatcher.instance.onError = (error, stack) {
+      debugPrint('PlatformDispatcher error: $error');
+      debugPrintStack(stackTrace: stack);
+      return true;
+    };
+
+    runZonedGuarded(
+      () => runApp(const MainApp()),
+      (error, stack) {
+        debugPrint('runZonedGuarded error: $error');
+        debugPrintStack(stackTrace: stack);
+      },
+    );
+    return;
+  }
+
   runApp(const MainApp());
 }
 
