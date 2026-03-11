@@ -18,7 +18,7 @@ import subprocess
 import logging.config
 
 from pynput.keyboard import Controller, Key, Listener, KeyCode
-from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath, sendNotification
+from args import LOGGER_CONF, customerror, forceLogFolder, assetsPath, sendNotification, log_exception, log_state, safe_log_value
 
 # Windows process creation flag to hide console windows
 CREATE_NO_WINDOW = 0x08000000
@@ -32,12 +32,26 @@ except:
 APPDATA = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 HEADER = ".RePCC"
 MACDATA = APPDATA + "\\" + HEADER
+ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
+
+ERROR_LOG_PATH = ROAMING + "\\.RePCC\\logs\\errors.txt"
+try:
+    os.makedirs(os.path.dirname(ERROR_LOG_PATH), exist_ok=True)
+    sys.stderr = open(ERROR_LOG_PATH, "a", buffering=1)
+except Exception:
+    pass
 
 FILEVER = "0.195"
 SPECIAL_KEY_MAP = {
     'ctrl': Key.ctrl,
+    'control': Key.ctrl,
+    'ctl': Key.ctrl,
     'shift': Key.shift,
+    'shiftkey': Key.shift,
     'alt': Key.alt,
+    'option': Key.alt,
+    'alt_gr': Key.alt_gr,
+    'altgr': Key.alt_gr,
     'enter': Key.enter,
     'return': Key.enter,  # Alias
     'tab': Key.tab,
@@ -81,50 +95,144 @@ SPECIAL_KEY_MAP = {
     'f19': Key.f19,
     'f20': Key.f20,
     'cmd': Key.cmd,
+    'win': Key.cmd,
+    'windows': Key.cmd,
+    'super': Key.cmd,
     'cmd_l': Key.cmd_l,
     'cmd_r': Key.cmd_r,
+    'left_win': Key.cmd_l,
+    'right_win': Key.cmd_r,
     'ctrl_l': Key.ctrl_l,
     'ctrl_r': Key.ctrl_r,
+    'left_ctrl': Key.ctrl_l,
+    'right_ctrl': Key.ctrl_r,
+    'lctrl': Key.ctrl_l,
+    'rctrl': Key.ctrl_r,
     'shift_l': Key.shift_l,
     'shift_r': Key.shift_r,
+    'left_shift': Key.shift_l,
+    'right_shift': Key.shift_r,
+    'lshift': Key.shift_l,
+    'rshift': Key.shift_r,
     'alt_l': Key.alt_l,
     'alt_r': Key.alt_r,
+    'left_alt': Key.alt_l,
+    'right_alt': Key.alt_r,
+    'lalt': Key.alt_l,
+    'ralt': Key.alt_r,
     'menu': Key.menu,
     'backspace_l': Key.backspace,
+    'pgup': Key.page_up,
+    'pgdn': Key.page_down,
+    'del': Key.delete,
+    'ins': Key.insert,
+    'spacebar': Key.space,
 }
+
+
+def normalize_macro_key_token(raw_key: str) -> str:
+    key = str(raw_key).strip().lower().replace("-", "_").replace(" ", "_")
+
+    alias_map = {
+        "control": "ctrl",
+        "ctl": "ctrl",
+        "leftcontrol": "left_ctrl",
+        "rightcontrol": "right_ctrl",
+        "leftalt": "left_alt",
+        "rightalt": "right_alt",
+        "leftshift": "left_shift",
+        "rightshift": "right_shift",
+        "pageup": "page_up",
+        "pagedown": "page_down",
+        "return": "enter",
+        "escape": "esc",
+    }
+
+    return alias_map.get(key, key)
 
 class macro():
     def __init__(self) -> None:
-        pass
-
         self.kill = False
         self.listener = None
+        self.listenerThread = None
+        self.listener_active = False
+        logger.debug("pcmac | macro instance created")
 
     def wait(self, time_ms:int|float):
+        total_ms = max(int(time_ms), 0)
+        if total_ms >= 100:
+            logger.debug(f"pcmac | wait start | duration_ms={total_ms} | kill={self.kill}")
         
-        for _ in range(int(time_ms)):
+        for _ in range(total_ms):
             if self.kill:
+                logger.info(f"pcmac | wait interrupted | duration_ms={total_ms}")
                 break
 
             time.sleep(1/1000)
 
-    def _keybindListener(self):
+        if total_ms >= 100:
+            logger.debug(f"pcmac | wait end | duration_ms={total_ms} | kill={self.kill}")
 
-        sendNotification("Macro help", "Press CONTROL and K at the same time to stop the macro.")
+    def _keybindListener(self):
+        logger.info("pcmac | key listener starting")
+        self.listener_active = True
+        logger.info("pcmac | key listener armed for CTRL+K")
 
         def press(key):
+            if not self.listener_active:
+                logger.debug("pcmac | key listener ignoring key because listener is inactive")
+                return False
+
+            logger.debug(f"pcmac | key listener received key={safe_log_value(key)}")
             if str(key) == "'\\x0b'": # CTRL + K  
                 print("Combo")
                 logger.info("Keycombo pressed, killing macro.")
                 self.kill = True
+                return False
 
         self.listener = Listener(on_press=press)
-        with self.listener:
-            self.listener.join()
+        try:
+            with self.listener:
+                self.listener.join()
+        finally:
+            self.listener_active = False
+            self.listener = None
+            logger.info("pcmac | key listener stopped")
 
     def startKeyListener(self):
+        logger.debug("pcmac | startKeyListener invoked")
+        self.stopKeyListener()
+
+        try:
+            sendNotification("Macro help", "Press CONTROL and K at the same time to stop the macro.")
+            logger.info("pcmac | key listener help notification sent")
+        except Exception as e:
+            log_exception(logger, "pcmac", "macro/startKeyListener/notification", e)
+
         self.listenerThread = threading.Thread(target=self._keybindListener, daemon=True)
+        self.listenerThread.name = f"macro-key-listener-{id(self)}"
         self.listenerThread.start()
+        logger.info(f"pcmac | key listener thread started | name={self.listenerThread.name}")
+
+    def stopKeyListener(self):
+        logger.debug("pcmac | stopKeyListener invoked")
+        self.listener_active = False
+
+        if self.listener:
+            try:
+                self.listener.stop()
+                logger.info("pcmac | key listener stop requested")
+            except Exception as e:
+                log_exception(logger, "pcmac", "macro/stopKeyListener/stop", e)
+
+        current_thread = threading.current_thread()
+        if self.listenerThread and self.listenerThread.is_alive() and self.listenerThread is not current_thread:
+            self.listenerThread.join(timeout=1.5)
+            logger.info(
+                f"pcmac | key listener thread join attempted | name={self.listenerThread.name} | alive={self.listenerThread.is_alive()}"
+            )
+
+        self.listenerThread = None
 
     def verifyStructure(self, jsonFilePathOrJSONdata:str|dict) -> bool:
         """
@@ -147,6 +255,8 @@ class macro():
         if not os.path.exists(str(jsonFilePathOrJSONdata)): # type: ignore
             datatype = "JSON"
 
+        log_state(logger, "pcmac.verifyStructure.input", datatype=datatype, source=jsonFilePathOrJSONdata)
+
         try:
             if datatype == "PATH":
                 logger.info("pcmac | Atempting to open file to verify the structure...")
@@ -163,7 +273,7 @@ class macro():
 
         except Exception as e:
             logger.error("pcmac | ERROR @ pcmac.py/macro/verifyStructure")
-            logger.error(customerror("pcmac", e))
+            log_exception(logger, "pcmac", "macro/verifyStructure/open", e, source=jsonFilePathOrJSONdata, datatype=datatype)
 
             return False
         
@@ -182,7 +292,7 @@ class macro():
 
             allowedTransitions = ["linear", "quadratic"]
 
-            logger.info(f"pcmac | CHECK_keys called for key {key}")
+            logger.info(f"pcmac | CHECK_keys called for key {i}")
             logger.info(f"        Appended data:")
             logger.info(f"        {req}")
             logger.info(f"        {data}")
@@ -271,6 +381,7 @@ Sleep is outside of range.
 
             try:
                 for key in data:
+                    logger.debug(f"pcmac | verifyStructure inspecting key={key} value={safe_log_value(data[key])}")
                     if key == "$data":
                         logger.info("pcmac | Key is $data, skipping.")
                         continue
@@ -292,7 +403,7 @@ Sleep is outside of range.
                     
             except Exception as e:
                 logger.error("pcmac | ERROR @ pcmac.py/macro/verifyStructure")
-                logger.error(customerror("pcmac", e))
+                log_exception(logger, "pcmac", "macro/verifyStructure/validate", e, parsed_keys=list(data.keys()))
                 if e.__class__ == KeyError:
                     logger.error("pcmac | -> File does not contain essential keys. Might not be macro format.")
                     return False
@@ -305,8 +416,10 @@ Sleep is outside of range.
         return False
 
     def presenter(self, presenterKey:str):
+        logger.info(f"pcmac | presenter invoked | presenterKey={presenterKey}")
 
         def press(key):
+            logger.debug(f"pcmac | presenter pressing key={safe_log_value(key)}")
 
             keyboard = Controller()
             keyboard.press(key)
@@ -314,9 +427,12 @@ Sleep is outside of range.
             keyboard.release(key)
 
         key = SPECIAL_KEY_MAP.get(presenterKey, None)
+        logger.debug(f"pcmac | presenter resolved key={safe_log_value(key)}")
 
         if not key == None:
             press(key)
+        else:
+            logger.warning(f"pcmac | presenter key not found | presenterKey={presenterKey}")
 
     def runMacro(self, MacroName:str):
         """
@@ -330,7 +446,9 @@ Sleep is outside of range.
 
         param_isLoop = None # default if no isloop param is missing
         param_amtLoops = None
-        kill = False
+        active_step = None
+        self.kill = False
+        logger.info(f"pcmac | runMacro invoked | macro={MacroName} | thread={threading.current_thread().name}")
 
         def handler_data(data:dict):
 
@@ -346,8 +464,11 @@ Sleep is outside of range.
                 param_amtLoops = data["amtLoops"]
                 logger.info(f"pcmac | macro: set amount of loops to {param_amtLoops}")
 
+            log_state(logger, "pcmac.runMacro.data", param_isLoop=param_isLoop, param_amtLoops=param_amtLoops)
+
         def handler_mousemove(x_then:float, y_then:float, transitionTimeMS:float, transition:str):
             logger.info("pcmac | Macro: Moving mouse.")
+            log_state(logger, "pcmac.runMacro.mousemove.start", x_then=x_then, y_then=y_then, transitionTimeMS=transitionTimeMS, transition=transition)
             
             def easing(x:float) -> float:
 
@@ -371,6 +492,7 @@ Sleep is outside of range.
 
             steps = max(int(transitionTimeMS*60), 1)
             sleep_time = transitionTimeMS / steps
+            log_state(logger, "pcmac.runMacro.mousemove.calculated", screen_width=screen_width, screen_height=screen_height, x_abs_then=x_abs_then, y_abs_then=y_abs_then, x_now=x_now, y_now=y_now, x_delta=x_delta, y_delta=y_delta, steps=steps, sleep_time=sleep_time)
 
             for i in range(steps + 1):
 
@@ -394,7 +516,10 @@ Sleep is outside of range.
                         self.wait(sleep_time+0.005)
                 
                 else: 
+                    logger.info(f"pcmac | Macro: Mouse move interrupted at step {i}/{steps}")
                     break
+
+            logger.debug("pcmac | Macro: Mouse move complete")
 
         def handler_mouseclick(button:int, pressSleep:int):
 
@@ -412,8 +537,10 @@ Sleep is outside of range.
                     win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0,0)
                     self.wait(pressSleep+0.001)
                     win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0,0)
+                logger.debug(f"pcmac | Macro: Mouse click complete | button={button}")
 
             else:
+                logger.info("pcmac | Macro: Mouse click skipped because kill flag is set")
                 return
             
         def handler_keyboard(actiontype:str, keys:list, presssleep:int):
@@ -426,13 +553,9 @@ Sleep is outside of range.
             if actiontype == "singlekey":
 
                 for key in keys:
-                
-                    actual_key = SPECIAL_KEY_MAP.get(key, key)
-
-                    if not key == actual_key:
-                        if key == key.upper():
-
-                            key = key.caps_lock
+                    normalized = normalize_macro_key_token(key)
+                    actual_key = SPECIAL_KEY_MAP.get(normalized, key)
+                    logger.debug(f"pcmac | Macro: singlekey resolved | raw={safe_log_value(key)} | normalized={normalized} | actual={safe_log_value(actual_key)}")
 
                     if not self.kill:
 
@@ -449,9 +572,10 @@ Sleep is outside of range.
 
                 if not self.kill:
                     for key in keys:
-                        key_lower = key.lower()
-                        actual_key = SPECIAL_KEY_MAP.get(key_lower, key_lower)
+                        normalized = normalize_macro_key_token(key)
+                        actual_key = SPECIAL_KEY_MAP.get(normalized, key)
                         actual_keys.append(actual_key)
+                        logger.debug(f"pcmac | Macro: multikey resolved | raw={safe_log_value(key)} | normalized={normalized} | actual={safe_log_value(actual_key)}")
 
                         keyboard.press(actual_key) # type: ignore[attr-defined]
 
@@ -462,6 +586,7 @@ Sleep is outside of range.
 
         try:
             macropath = MACDATA + "\\macros\\" + MacroName
+            log_state(logger, "pcmac.runMacro.paths", macropath=macropath, macdata=MACDATA)
             if not os.path.exists(macropath):
                 raise ValueError("Macro does not exsist in saved.")
             
@@ -470,37 +595,52 @@ Sleep is outside of range.
                 data = json.load(f)
                 f.close()
                 print(data)
+            log_state(logger, "pcmac.runMacro.loaded", keys=list(data.keys()), metadata=data.get("$data") if isinstance(data, dict) else None)
 
             def run():
+                nonlocal active_step
+                logger.info(f"pcmac | Macro: run loop starting | total_steps={len(data)}")
 
                 for step in data:
+                    active_step = step
                     if step == "$data":
                         logger.info("pcmac | Macro: Setp is data. Skipping.")
                         continue
 
                     actiondata = data[step]["actiondata"]
+                    log_state(logger, "pcmac.runMacro.step", step=step, step_data=data[step])
                     
                     logger.info("pcmac | Macro: Waiting before executing next step...")
                     logger.info("pcmac | Macro: " + str(data[step]["sleep"]/1000) + " seconds.")
                     self.wait(data[step]["sleep"]+0.001)
 
-                    if self.kill: break
+                    if self.kill:
+                        logger.info(f"pcmac | Macro: breaking before step execution because kill was set | step={step}")
+                        break
                     
-                    if data[step]["type"] == "mouse" and data[step]["actiontype"] == "move":
-                        handler_mousemove(actiondata[0], actiondata[1], data[step]["transitiontime"], data[step]["transition"])
-                        continue
+                    try:
+                        if data[step]["type"] == "mouse" and data[step]["actiontype"] == "move":
+                            handler_mousemove(actiondata[0], actiondata[1], data[step]["transitiontime"], data[step]["transition"])
+                            continue
 
-                    if data[step]["type"] == "mouse" and data[step]["actiontype"] == "click":
-                        handler_mouseclick(actiondata[0], data[step]["presssleep"])
-                        continue
-                    
-                    if data[step]["type"] == "keyboard":
-                        handler_keyboard(data[step]["actiontype"], actiondata, data[step]["presssleep"])
-                        continue
+                        if data[step]["type"] == "mouse" and data[step]["actiontype"] == "click":
+                            handler_mouseclick(actiondata[0], data[step]["presssleep"])
+                            continue
+                        
+                        if data[step]["type"] == "keyboard":
+                            handler_keyboard(data[step]["actiontype"], actiondata, data[step]["presssleep"])
+                            continue
+
+                        logger.warning(f"pcmac | Macro: Unhandled step type encountered | step={step} | type={data[step].get('type')} | actiontype={data[step].get('actiontype')}")
+                    except Exception as e:
+                        log_exception(logger, "pcmac", "macro/runMacro/step", e, macro=MacroName, step=step, step_data=data[step])
+                        raise
 
                 if self.kill:
-                    sendNotification("Macro status", "Forced macro to shut down with keycombo")
+                    logger.info(f"pcmac | Macro: run loop exiting due to kill flag | macro={MacroName}")
                     return
+
+                logger.info(f"pcmac | Macro: run loop completed | macro={MacroName}")
 
             if "$data" in data:
                 logger.info("main | macro: Macro has included data, extracting...")
@@ -508,46 +648,74 @@ Sleep is outside of range.
                 logger.info(f"main | macro: extracted data: { data['$data'] }")
 
             try:
+                log_state(logger, "pcmac.runMacro.mode", param_isLoop=param_isLoop, param_amtLoops=param_amtLoops)
 
                 if param_isLoop == True:
                     self.startKeyListener()
+                    logger.info(f"pcmac | Macro: entering infinite loop mode | macro={MacroName}")
                     while True:
 
                         if self.kill: 
-                            if self.listener:
-                                self.listener.stop()
-                            if self.listenerThread:
-                                self.listenerThread.join()
+                            self.stopKeyListener()
+                            logger.info(f"pcmac | Macro: loop mode stopped by kill flag | macro={MacroName}")
                             break
 
                         run()
+
+                        if self.kill:
+                            self.stopKeyListener()
+                            logger.info(f"pcmac | Macro: infinite loop exiting after killed iteration | macro={MacroName}")
+                            break
 
                 elif param_amtLoops > 1 and not param_amtLoops == None: # type: ignore[attr-defined]
                     self.startKeyListener()
-                    for _ in range(int(param_amtLoops)): # type: ignore[attr-defined]
+                    logger.info(f"pcmac | Macro: entering fixed loop mode | macro={MacroName} | loops={param_amtLoops}")
+                    for loop_index in range(int(param_amtLoops)): # type: ignore[attr-defined]
+                        logger.info(f"pcmac | Macro: fixed loop iteration starting | macro={MacroName} | iteration={loop_index + 1}/{int(param_amtLoops)}")
                         
                         if self.kill: 
-                            if self.listener:
-                                self.listener.stop()
-                            if self.listenerThread:
-                                self.listenerThread.join()
+                            self.stopKeyListener()
+                            logger.info(f"pcmac | Macro: fixed loop stopped by kill flag | macro={MacroName}")
                             break
 
+                        logger.debug(f"pcmac | Macro: invoking run() for fixed loop iteration {loop_index + 1}")
                         run()
-            except Exception:
-                if not Exception.__class__ == KeyboardInterrupt:
+
+                        if self.kill:
+                            self.stopKeyListener()
+                            logger.info(f"pcmac | Macro: fixed loop exiting after killed iteration | macro={MacroName} | iteration={loop_index + 1}")
+                            break
+
+                else:
+                    self.startKeyListener()
+                    logger.info(f"pcmac | Macro: entering single-run mode | macro={MacroName}")
+                    logger.debug("pcmac | Macro: invoking run() for single-run mode")
+                    run()
+
+                    if self.kill:
+                        logger.info(f"pcmac | Macro: single-run exited after kill flag | macro={MacroName}")
+            except Exception as e:
+                log_exception(logger, "pcmac", "macro/runMacro/loop-wrapper", e, macro=MacroName, active_step=active_step, param_isLoop=param_isLoop, param_amtLoops=param_amtLoops)
+                if e.__class__ != KeyboardInterrupt:
 
                     print("error, so single")
+                    logger.warning(f"pcmac | Macro: loop wrapper failed, retrying single run | macro={MacroName}")
 
                     self.startKeyListener()
                     run()
 
-            if self.kill: self.kill = False
+            finally:
+                self.stopKeyListener()
+
+            if self.kill:
+                logger.info(f"pcmac | Macro: resetting kill flag after run | macro={MacroName}")
+                self.kill = False
+            logger.info(f"pcmac | runMacro finished | macro={MacroName}")
             return
 
         except Exception as e:
             logger.error("pcmac | ERROR @ pcmac.py/macro/runMacro")
-            logger.error(customerror("pcmac", e))
+            log_exception(logger, "pcmac", "macro/runMacro", e, macro=MacroName, active_step=active_step, listener_started=self.listenerThread is not None)
 
 def initializePCMAC():
 

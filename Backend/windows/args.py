@@ -6,6 +6,8 @@ import yaml
 import random
 import logging
 import threading
+import traceback
+import faulthandler
 import logging.config
 
 from win11toast import toast
@@ -36,12 +38,19 @@ FILEVER = "0.41-INDEV-PREVIEW"
 ROAMING = os.path.expanduser(os.getenv("USERPROFILE")) + "\\AppData\\Roaming"
 TWOFACODE = None
 
+try:
+    os.makedirs(ROAMING+"\\.RePCC\\logs", exist_ok=True)
+    _fault_log = open(ROAMING+"\\.RePCC\\logs\\faults.log", "a", buffering=1)
+    faulthandler.enable(_fault_log)
+except Exception:
+    _fault_log = None
+
 LOGGER_CONF = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
         "simpleFormatter": {
-            "format": "%(asctime)s | %(levelname)-7s | %(name)-12s | %(message)s",
+            "format": "%(asctime)s | %(levelname)-7s | %(threadName)-16s | %(filename)s:%(lineno)d | %(name)-12s | %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S"
         }
     },
@@ -54,7 +63,7 @@ LOGGER_CONF = {
         },
         "fileHandler": {
             "class": "logging.handlers.RotatingFileHandler",
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "simpleFormatter",
             "filename": str(ROAMING+"\\.RePCC\\logs\\repcc.log"),
             "mode": "a",
@@ -64,13 +73,13 @@ LOGGER_CONF = {
     },
     "loggers": {
         "RePCC": {
-            "level": "INFO",
+            "level": "DEBUG",
             "handlers": ["fileHandler"],
             "propagate": False
         }
     },
     "root": {
-        "level": "INFO",
+        "level": "DEBUG",
         "handlers": ["consoleHandler", "fileHandler"]
     }
 }
@@ -80,7 +89,7 @@ def customerror(module:str, e):
 
 def forceLogFolder():
 
-    os.makedirs(ROAMING+"\\.RePCC\\logs")
+    os.makedirs(ROAMING+"\\.RePCC\\logs", exist_ok=True)
 
     logging.config.dictConfig(LOGGER_CONF)
     logger = logging.getLogger("RePCC")
@@ -88,6 +97,32 @@ def forceLogFolder():
     logger.debug("CONFIG | Log folder forefully created.")
 
     return logger
+
+def safe_log_value(value, limit:int=500) -> str:
+    try:
+        rendered = repr(value)
+    except Exception as exc:
+        rendered = f"<unreprable {type(value).__name__}: {exc}>"
+
+    if len(rendered) > limit:
+        return rendered[:limit] + "...<trimmed>"
+
+    return rendered
+
+def log_state(logger:logging.Logger, context:str, **values):
+    if not values:
+        logger.debug(f"STATE | {context} | <empty>")
+        return
+
+    formatted = ", ".join(f"{key}={safe_log_value(value)}" for key, value in values.items())
+    logger.debug(f"STATE | {context} | {formatted}")
+
+def log_exception(logger:logging.Logger, module:str, context:str, exc:Exception, **context_data):
+    if context_data:
+        log_state(logger, f"{module}:{context}", **context_data)
+
+    logger.error(customerror(module, exc))
+    logger.error(f"{module} | TRACEBACK @ {context}\n{traceback.format_exc()}")
 
 def NEW2FA():
     global TWOFACODE
