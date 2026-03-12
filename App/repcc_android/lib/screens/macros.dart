@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/macro.dart';
 import '../models/macro_store.dart';
+import 'macro_builder.dart';
 
 class MacroScreen extends StatefulWidget {
   const MacroScreen({super.key});
@@ -98,6 +99,7 @@ class _MacroScreenState extends State<MacroScreen> {
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           name: name,
           body: body,
+          workspace: '',
           updatedAtMs: nowMs,
         ),
       );
@@ -106,6 +108,48 @@ class _MacroScreenState extends State<MacroScreen> {
       final updated = existing.copyWith(
         name: name,
         body: body,
+        updatedAtMs: nowMs,
+      );
+      if (idx >= 0) {
+        next[idx] = updated;
+      } else {
+        next.insert(0, updated);
+      }
+    }
+
+    await _store.save(next);
+    if (!mounted) return;
+    setState(() => _macros = next);
+  }
+
+  Future<void> _openMacroBuilder({Macro? existing}) async {
+    final result = await Navigator.of(context).push<MacroBuilderResult>(
+      MaterialPageRoute(
+        builder: (_) => MacroBuilderScreen(existing: existing),
+      ),
+    );
+
+    if (result == null) return;
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final next = [..._macros];
+    if (existing == null) {
+      next.insert(
+        0,
+        Macro(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          name: result.name,
+          body: result.compiledMacroJson,
+          workspace: result.workspaceJson,
+          updatedAtMs: nowMs,
+        ),
+      );
+    } else {
+      final idx = next.indexWhere((m) => m.id == existing.id);
+      final updated = existing.copyWith(
+        name: result.name,
+        body: result.compiledMacroJson,
+        workspace: result.workspaceJson,
         updatedAtMs: nowMs,
       );
       if (idx >= 0) {
@@ -164,6 +208,13 @@ class _MacroScreenState extends State<MacroScreen> {
           ),
         ),
         title: const Text('Macros'),
+        actions: [
+          IconButton(
+            tooltip: 'Open Blockly Macro Builder',
+            onPressed: () => _openMacroBuilder(),
+            icon: const Icon(Icons.account_tree_outlined),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _upsertMacro(),
@@ -211,15 +262,33 @@ class _MacroScreenState extends State<MacroScreen> {
                               color: colorScheme.onTertiary.withOpacity(0.6)),
                         ),
                         onTap: () => _upsertMacro(existing: macro),
-                        trailing: IconButton(
-                          onPressed: () => _deleteMacro(macro),
-                          icon: SvgPicture.asset(
-                            'assets/Icons/delete.svg',
-                            colorFilter: ColorFilter.mode(
-                                colorScheme.onTertiary.withOpacity(0.7),
-                                BlendMode.srcIn),
-                            width: 22,
-                            height: 22,
+                        trailing: SizedBox(
+                          width: 96,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                tooltip: 'Edit in Blockly Builder',
+                                onPressed: () =>
+                                    _openMacroBuilder(existing: macro),
+                                icon: Icon(
+                                  Icons.account_tree_outlined,
+                                  color:
+                                      colorScheme.onTertiary.withOpacity(0.75),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => _deleteMacro(macro),
+                                icon: SvgPicture.asset(
+                                  'assets/Icons/delete.svg',
+                                  colorFilter: ColorFilter.mode(
+                                      colorScheme.onTertiary.withOpacity(0.7),
+                                      BlendMode.srcIn),
+                                  width: 22,
+                                  height: 22,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

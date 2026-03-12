@@ -4,8 +4,11 @@ class Macro {
   final String id;
   final String name;
 
-  /// Stored as text so you can paste valid `.pcmac` JSON (or any payload for now).
+  /// Compiled payload sent to the backend (expected `.pcmac` JSON).
   final String body;
+
+  /// Serialized Blockly workspace JSON for re-opening visual editor state.
+  final String workspace;
 
   final int updatedAtMs;
 
@@ -13,6 +16,7 @@ class Macro {
     required this.id,
     required this.name,
     required this.body,
+    this.workspace = '',
     required this.updatedAtMs,
   });
 
@@ -20,12 +24,14 @@ class Macro {
     String? id,
     String? name,
     String? body,
+    String? workspace,
     int? updatedAtMs,
   }) {
     return Macro(
       id: id ?? this.id,
       name: name ?? this.name,
       body: body ?? this.body,
+      workspace: workspace ?? this.workspace,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }
@@ -34,6 +40,7 @@ class Macro {
         'id': id,
         'name': name,
         'body': body,
+        'workspace': workspace,
         'updatedAtMs': updatedAtMs,
       };
 
@@ -42,6 +49,7 @@ class Macro {
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       body: (json['body'] ?? '').toString(),
+      workspace: (json['workspace'] ?? '').toString(),
       updatedAtMs: (json['updatedAtMs'] is int)
           ? (json['updatedAtMs'] as int)
           : int.tryParse((json['updatedAtMs'] ?? '0').toString()) ?? 0,

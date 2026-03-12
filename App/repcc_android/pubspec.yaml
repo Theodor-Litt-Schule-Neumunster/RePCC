@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_blockly: ^1.6.0
   flutter_svg: ^2.2.0
   multicast_dns: ^0.3.2+7
   shared_preferences: ^2.5.3
