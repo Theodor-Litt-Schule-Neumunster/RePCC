@@ -212,7 +212,13 @@ class _MacroScreenState extends State<MacroScreen> {
           IconButton(
             tooltip: 'Open Blockly Macro Builder',
             onPressed: () => _openMacroBuilder(),
-            icon: const Icon(Icons.account_tree_outlined),
+            icon: SvgPicture.asset(
+              'assets/Icons/grid.svg',
+              colorFilter:
+                  ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+              width: 22,
+              height: 22,
+            ),
           ),
         ],
       ),
@@ -271,10 +277,13 @@ class _MacroScreenState extends State<MacroScreen> {
                                 tooltip: 'Edit in Blockly Builder',
                                 onPressed: () =>
                                     _openMacroBuilder(existing: macro),
-                                icon: Icon(
-                                  Icons.account_tree_outlined,
-                                  color:
+                                icon: SvgPicture.asset(
+                                  'assets/Icons/grid.svg',
+                                  colorFilter: ColorFilter.mode(
                                       colorScheme.onTertiary.withOpacity(0.75),
+                                      BlendMode.srcIn),
+                                  width: 22,
+                                  height: 22,
                                 ),
                               ),
                               IconButton(
