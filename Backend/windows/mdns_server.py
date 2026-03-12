@@ -32,15 +32,6 @@ def get_local_ip():
 
     candidates = []
 
-    try:
-        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
-        for _, _, _, _, sockaddr in infos:
-            ip = sockaddr[0]
-            if is_usable(ip) and ip not in candidates:
-                candidates.append(ip)
-    except Exception:
-        pass
-
     # Ask routing table for outbound interface without sending traffic.
     for target in (("10.255.255.255", 1), ("8.8.8.8", 80)):
         sock = None
@@ -55,6 +46,15 @@ def get_local_ip():
         finally:
             if sock:
                 sock.close()
+
+    try:
+        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+        for _, _, _, _, sockaddr in infos:
+            ip = sockaddr[0]
+            if is_usable(ip) and ip not in candidates:
+                candidates.append(ip)
+    except Exception:
+        pass
 
     preferred = [ip for ip in candidates if is_preferred_private(ip)]
     if preferred:

@@ -42,7 +42,7 @@ from pcmac import initializePCMAC, macro
 from args import (
     LOGGER_CONF, NEW2FA, customerror, forceLogFolder, assetsPath, getSetting, sendRandomWakeNotif,
     sendNotification, getDebugSettings, getRegistryYaml, getPresentationSettings, findRegisteredHost,
-    getWebRtcSettings
+    getWebRtcSettings, log_exception, log_state
 )
 
 # --
@@ -151,11 +151,13 @@ def requestsInit():
         @App.get("/macro/run/{name}")
         async def macros_run(request:Request, name:str): # NOTE: Has IP check now
             if name:
+                logger.info(f"main | macro run request received | client={request.client.host} | raw_name={name}") #type: ignore[attr-defined]
 
                 if not name[-6:] == ".pcmac":
                     name = name+".pcmac"
 
                 PATHMACRO = ROAMING + "\\.RePCC\\macros\\" + name
+                log_state(logger, "main.macros_run.request", client=request.client.host, macro=name, path=PATHMACRO) #type: ignore[attr-defined]
 
                 if not os.path.exists(PATHMACRO):
                     logger.error(customerror("main", "Attemted to run macro that does not exist."))
@@ -165,17 +167,22 @@ def requestsInit():
                     macroHandler = macro()
 
                     if not findRegisteredHost(request.client.host): #type: ignore
+                        logger.warning(f"main | macro run denied for unregistered host | client={request.client.host} | macro={name}") #type: ignore[attr-defined]
                         return JSONResponse({"error":"Not allowed"}, status_code=405)
 
                     if macroHandler.verifyStructure(PATHMACRO):
-                        threading.Thread(target=macroHandler.runMacro, args=(name,)).start()
+                        logger.info(f"main | macro structure verified | macro={name}")
+                        macro_thread = threading.Thread(target=macroHandler.runMacro, args=(name,), daemon=True, name=f"macro-run-{os.path.splitext(name)[0]}")
+                        macro_thread.start()
+                        logger.info(f"main | macro thread started | macro={name} | thread={macro_thread.name}")
                         return JSONResponse({"message":"Great success!"}, status_code=200)
                     
+                    logger.warning(f"main | macro structure invalid | macro={name}")
                     return JSONResponse({"error":"Macro structure is not ok"}, status_code=400)
 
                 except Exception as e:
                     logger.error("main | ERROR @ main.py/_macroRequests/macros_run")
-                    logger.error(customerror("main", e))
+                    log_exception(logger, "main", "_macroRequests/macros_run", e, client=request.client.host, macro=name, path=PATHMACRO) #type: ignore[attr-defined]
                     return JSONResponse({"error":"Fail inside macros_run"}, status_code=500)
             else: 
                 customerror("main", "Attempted to run macro without parsing name.")
@@ -728,25 +735,32 @@ def tray_main():
             nonlocal active_macro_runner
             nonlocal active_macro_thread
 
+            logger.info(f"main | tray macro run requested | macro={macro_file_name}")
+
             stop_active_macro()
 
             macro_path = os.path.join(MACROS_DIR, macro_file_name)
+            log_state(logger, "main.tray.run_macro", macro=macro_file_name, path=macro_path)
             if not os.path.exists(macro_path):
                 sendNotification("Macro", f"Macro '{macro_file_name}' does not exist.")
+                logger.warning(f"main | tray macro missing | macro={macro_file_name}")
                 refresh_menu(icon)
                 return
 
             runner = macro()
             if not runner.verifyStructure(macro_path):
                 sendNotification("Macro", f"Macro '{macro_file_name}' has invalid structure.")
+                logger.warning(f"main | tray macro invalid structure | macro={macro_file_name}")
                 refresh_menu(icon)
                 return
 
             def worker():
                 try:
+                    logger.info(f"main | tray macro worker starting | macro={macro_file_name} | thread={threading.current_thread().name}")
                     runner.runMacro(macro_file_name)
+                    logger.info(f"main | tray macro worker finished | macro={macro_file_name}")
                 except Exception as e:
-                    logger.error(customerror("main", f"Tray macro run failed: {e}"))
+                    log_exception(logger, "main", "tray/run_macro", e, macro=macro_file_name, path=macro_path)
                 finally:
                     nonlocal active_macro_runner
                     nonlocal active_macro_thread
@@ -755,13 +769,14 @@ def tray_main():
                             active_macro_runner = None
                             active_macro_thread = None
 
-            thread = threading.Thread(target=worker, daemon=True)
+            thread = threading.Thread(target=worker, daemon=True, name=f"tray-macro-{os.path.splitext(macro_file_name)[0]}")
 
             with macro_thread_lock:
                 active_macro_runner = runner
                 active_macro_thread = thread
 
             thread.start()
+            logger.info(f"main | tray macro thread started | macro={macro_file_name} | thread={thread.name}")
             sendNotification("Macro", f"Started macro '{macro_file_name}'.")
             refresh_menu(icon)
 

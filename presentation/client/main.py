@@ -1,5 +1,5 @@
-# pyinstaller --noconfirm --onefile --noconsole --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
-# pyinstaller --noconfirm --onefile --add-data "assets;assets" --uac-admin --icon="./assets/repccBin.ico" main.py
+# pyinstaller --noconfirm --onefile --noconsole --add-data "assets;assets" --icon="./assets/repccBin.ico" main.py
+# pyinstaller --noconfirm --onefile --add-data "assets;assets" --icon="./assets/repccBin.ico" main.py
 
 import os
 import sys
