@@ -246,6 +246,7 @@ class _MacroBuilderScreenState extends State<MacroBuilderScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final canPop = Navigator.of(context).canPop();
     final isPhonePortrait = MediaQuery.of(context).size.width < 700 &&
         MediaQuery.of(context).orientation == Orientation.portrait;
     final initialWorkspace =
@@ -253,6 +254,22 @@ class _MacroBuilderScreenState extends State<MacroBuilderScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: canPop
+            ? IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: SvgPicture.asset(
+                  'assets/Icons/arrow_back.svg',
+                  colorFilter: ColorFilter.mode(
+                    theme.colorScheme.onTertiary,
+                    BlendMode.srcIn,
+                  ),
+                  width: 22,
+                  height: 22,
+                ),
+              )
+            : null,
         title: Text(_nameController.text.trim().isEmpty
             ? 'Macro Builder'
             : _nameController.text.trim()),

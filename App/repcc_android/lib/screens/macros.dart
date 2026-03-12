@@ -210,8 +210,8 @@ class _MacroScreenState extends State<MacroScreen> {
         title: const Text('Macros'),
         actions: [
           IconButton(
-            tooltip: 'Open Blockly Macro Builder',
-            onPressed: () => _openMacroBuilder(),
+            tooltip: 'Add macro as JSON',
+            onPressed: () => _upsertMacro(),
             icon: SvgPicture.asset(
               'assets/Icons/grid.svg',
               colorFilter:
@@ -223,14 +223,14 @@ class _MacroScreenState extends State<MacroScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _upsertMacro(),
+        onPressed: () => _openMacroBuilder(),
         icon: SvgPicture.asset(
           'assets/Icons/add.svg',
           colorFilter: ColorFilter.mode(colorScheme.onPrimary, BlendMode.srcIn),
           width: 24,
           height: 24,
         ),
-        label: const Text('Add Macro'),
+        label: const Text('Macro Editor'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
