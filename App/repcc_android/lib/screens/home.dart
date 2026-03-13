@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import '../models/device.dart';
@@ -16,11 +17,42 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  static const Duration _statusPollInterval = Duration(seconds: 10);
 
   // List of devices managed by the state - now starts empty
   List<Device> devices = [];
   bool isGridStyle = false;
   bool _isRefreshingStatus = false;
+  bool _isStatusPollInProgress = false;
+  Timer? _statusPollTimer;
+
+  final Map<String, int> _consecutivePingFailures = {};
+  final Set<String> _stoppedPollingDeviceIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _startStatusPolling();
+  }
+
+  @override
+  void dispose() {
+    _statusPollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startStatusPolling() {
+    _statusPollTimer?.cancel();
+    _statusPollTimer = Timer.periodic(_statusPollInterval, (_) {
+      _pollDeviceStatuses();
+    });
+  }
+
+  void _syncStatusTrackingWithDevices() {
+    final deviceIds = devices.map((device) => device.id).toSet();
+    _consecutivePingFailures.removeWhere((id, _) => !deviceIds.contains(id));
+    _stoppedPollingDeviceIds.removeWhere((id) => !deviceIds.contains(id));
+  }
 
   Future<bool> _checkDeviceConnectivity(Device device) async {
     final portsToCheck = <int>{...device.ports, 15248}.toList();
@@ -68,6 +100,38 @@ class _HomeScreenState extends State<HomeScreen> {
     return false;
   }
 
+  Future<void> _pollDeviceStatuses() async {
+    if (_isStatusPollInProgress || devices.isEmpty) return;
+
+    _isStatusPollInProgress = true;
+    try {
+      for (final device in devices) {
+        if (_stoppedPollingDeviceIds.contains(device.id)) {
+          continue;
+        }
+
+        final isConnected = await _checkDeviceConnectivity(device);
+        if (isConnected) {
+          device.isConnected = true;
+          _consecutivePingFailures[device.id] = 0;
+          _stoppedPollingDeviceIds.remove(device.id);
+        } else {
+          final failures = (_consecutivePingFailures[device.id] ?? 0) + 1;
+          _consecutivePingFailures[device.id] = failures;
+          device.isConnected = false;
+          if (failures >= 3) {
+            _stoppedPollingDeviceIds.add(device.id);
+          }
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {});
+    } finally {
+      _isStatusPollInProgress = false;
+    }
+  }
+
   Future<void> _refreshAllDeviceStatuses() async {
     if (_isRefreshingStatus || devices.isEmpty) return;
 
@@ -77,7 +141,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     for (final device in devices) {
       final isConnected = await _checkDeviceConnectivity(device);
-      device.isConnected = isConnected;
+      if (isConnected) {
+        device.isConnected = true;
+        _consecutivePingFailures[device.id] = 0;
+        _stoppedPollingDeviceIds.remove(device.id);
+      } else {
+        final failures = (_consecutivePingFailures[device.id] ?? 0) + 1;
+        _consecutivePingFailures[device.id] = failures;
+        device.isConnected = false;
+        if (failures >= 3) {
+          _stoppedPollingDeviceIds.add(device.id);
+        }
+      }
     }
 
     if (!mounted) return;
@@ -160,6 +235,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pop(context);
                 Navigator.push(context,
                     MaterialPageRoute(builder: (context) => ConnectScreen()));
+              },
+            ),
+            ListTile(
+              leading: SvgPicture.asset('assets/Icons/keyboard.svg',
+                  colorFilter:
+                      ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
+                  width: 24,
+                  height: 24),
+              title: Text('Macros',
+                  style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => const MacroScreen()));
               },
             ),
           ],
@@ -282,6 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           return _buildDeviceGridCard(devices[index], () {
                             setState(() {
                               devices.removeAt(index);
+                              _syncStatusTrackingWithDevices();
                             });
                           });
                         },
@@ -292,6 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           return _buildDeviceCard(devices[index], () {
                             setState(() {
                               devices.removeAt(index);
+                              _syncStatusTrackingWithDevices();
                             });
                           });
                         },
@@ -347,9 +438,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       try {
                         newDevice.isConnected =
                             await _checkDeviceConnectivity(newDevice);
+                        _consecutivePingFailures[newDevice.id] =
+                            newDevice.isConnected ? 0 : 1;
+                        if (newDevice.isConnected) {
+                          _stoppedPollingDeviceIds.remove(newDevice.id);
+                        } else if (_consecutivePingFailures[newDevice.id]! >= 3) {
+                          _stoppedPollingDeviceIds.add(newDevice.id);
+                        }
                         if (!mounted) return;
                         setState(() {
                           devices.add(newDevice);
+                          _syncStatusTrackingWithDevices();
                         });
                       } catch (error, stackTrace) {
                         if (kDebugMode) {
@@ -415,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 12),
                 children: [
                   TextSpan(
-                    text: device.isConnected ? 'Reachable' : 'Unreachable',
+                    text: device.isConnected ? 'Online' : 'Offline',
                     style: TextStyle(
                         color: device.isConnected
                             ? colorScheme.primary
@@ -508,7 +607,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              device.isConnected ? 'Reachable' : 'Unreachable',
+              device.isConnected ? 'Online' : 'Offline',
               style: TextStyle(
                 color: device.isConnected
                     ? colorScheme.primary
