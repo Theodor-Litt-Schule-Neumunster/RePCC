@@ -1,0 +1,67 @@
+@startuml pcmac_4_initialize
+
+title RePCC pcmac.py - Detail 3: initializePCMAC()
+
+skinparam backgroundColor #FDFCF9
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam sequence {
+  ArrowColor #0F4C81
+  ParticipantBorderColor #0F4C81
+  ParticipantBackgroundColor #EAF3FF
+  LifeLineBorderColor #8AAED1
+  LifeLineBackgroundColor #F6FAFF
+  GroupBorderColor #8AAED1
+  GroupBackgroundColor #F5F9FF
+}
+
+autonumber "[D3-000]"
+
+participant "initializePCMAC" as INIT
+participant "versionVerification" as VV
+participant "fileVerification" as FV
+participant "regVerification" as RV
+participant "ensure_registry_value" as ERV
+participant "restartExplorer" as RE
+participant "Filesystem\n(Roaming)" as FS
+participant "Windows Registry\n(HKCR)" as REG
+
+INIT -> VV: versionVerification()
+activate VV
+VV -> FS: version-Datei lesen
+
+alt Version fehlt oder stimmt nicht ueberein
+  VV -> FV: fileVerification()
+  activate FV
+  FV -> FS: Fehlende Ordner anlegen\n(.RePCC / macros / settings / ...)
+  FV -> FS: Standard-Assets + Settings kopieren
+  FV -> FS: version-Datei schreiben
+  deactivate FV
+end
+deactivate VV
+
+INIT -> RV: regVerification()
+activate RV
+
+alt Adminrechte vorhanden
+  RV -> ERV: .pcmac -> RePCC_File
+  ERV -> REG: Key pruefen / setzen
+  RV -> ERV: DefaultIcon setzen
+  ERV -> REG: Key pruefen / setzen
+  RV -> ERV: shell open command setzen\n(openfile.exe "%1")
+  ERV -> REG: Key pruefen / setzen
+
+  alt Registry wurde geaendert
+    RV -> RE: restartExplorer()
+    RE -> RE: taskkill explorer.exe\n+ explorer.exe starten
+  else Keine Aenderung noetig
+    RV -> RV: Alles korrekt, nichts zu tun
+  end
+else Keine Adminrechte
+  RV -> RV: Fehler loggen
+end
+deactivate RV
+
+INIT --> INIT: Initialisierung abgeschlossen
+
+@enduml

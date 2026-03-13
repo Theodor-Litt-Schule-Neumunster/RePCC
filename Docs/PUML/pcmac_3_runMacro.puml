@@ -1,0 +1,76 @@
+@startuml pcmac_3_runMacro
+
+title RePCC pcmac.py - Detail 2: runMacro(MacroName)
+
+skinparam backgroundColor #FDFCF9
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam sequence {
+  ArrowColor #1E5B43
+  ParticipantBorderColor #1E5B43
+  ParticipantBackgroundColor #E9F7F0
+  LifeLineBorderColor #9FC6AE
+  LifeLineBackgroundColor #F5FCF7
+  GroupBorderColor #9FC6AE
+  GroupBackgroundColor #F2FAF5
+}
+
+autonumber "[D2-000]"
+
+actor Caller
+participant "runMacro" as RM
+participant "FS\n(Roaming macros)" as FS2
+participant "KeyListener\n(CTRL+K)" as KL
+participant "run()\n[step loop]" as RUN
+participant "Handlers\n(mouse / keyboard / data)" as H
+
+Caller -> RM: runMacro(name)
+activate RM
+RM -> FS2: Macro-Datei laden
+
+alt Datei nicht gefunden / JSON Fehler
+  RM --> Caller: log_exception + Abbruch
+  deactivate RM
+else OK
+  FS2 --> RM: JSON-Daten
+end
+
+opt $data vorhanden
+  RM -> H: handler_data($data)\nisLoop / amtLoops lesen
+end
+
+RM -> KL: startKeyListener()
+note right: Hinweis an User und\nCTRL+K im Hintergrund-Thread
+
+alt isLoop == true
+  loop bis kill == true
+    RM -> RUN: run()
+    RUN -> H: je Step: handler_mousemove / mouseclick / keyboard
+    opt CTRL+K gedrueckt
+      KL -> RM: kill = true
+    end
+  end
+else amtLoops > 1
+  loop i = 1 .. amtLoops
+    RM -> RUN: run()
+    opt CTRL+K gedrueckt
+      KL -> RM: kill = true → break
+    end
+  end
+else Single Run
+  RM -> RUN: run() einmal
+end
+
+RM -> KL: stopKeyListener()
+RM -> RM: kill-Flag zuruecksetzen
+RM --> Caller: return
+
+deactivate RM
+
+note over H
+handler_mousemove: SetCursorPos mit Linear/Quadratic-Easing
+handler_mouseclick: mouse_event(down/up) + pressSleep
+handler_keyboard: singlekey oder multikey (gleichzeitig)
+end note
+
+@enduml

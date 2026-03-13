@@ -1,0 +1,119 @@
+@startuml pcmac_runmacro_sequence
+' RePCC - pcmac.py (macro.runMacro) sequence for presentation
+
+title RePCC pcmac.py - runMacro Ablauf (inkl. Loop-Modi und Not-Aus)
+
+skinparam backgroundColor #FCFDF8
+skinparam shadowing false
+skinparam roundcorner 14
+skinparam sequence {
+  ArrowColor #1C5D3A
+  ActorBorderColor #1C5D3A
+  ParticipantBorderColor #1C5D3A
+  ParticipantBackgroundColor #EAF8EF
+  LifeLineBorderColor #9FC6AE
+  LifeLineBackgroundColor #F5FCF7
+  GroupBorderColor #9FC6AE
+  GroupBackgroundColor #F2FAF5
+}
+skinparam note {
+  BackgroundColor #FFF8E6
+  BorderColor #D7B56D
+}
+
+autonumber "[000]"
+
+actor User
+participant "Caller\n(openfile.py / app)" as Caller
+participant "macro.runMacro()" as RunMacro
+participant "Filesystem\n(Roaming/.RePCC/macros)" as FS
+participant "JSON Data" as Data
+participant "KeyListener\n(CTRL+K)" as Listener
+participant "Input Handler\n(mouse/keyboard)" as Handler
+participant "Windows API\n(win32api/win32con)" as WinAPI
+participant "Logger" as Logger
+
+== Start ==
+
+User -> Caller: Startet Macro
+Caller -> RunMacro: runMacro("<name>.pcmac")
+activate RunMacro
+
+RunMacro -> Logger: runMacro invoked
+RunMacro -> FS: Lade Macro-Datei
+
+alt Datei fehlt
+  RunMacro -> Logger: ERROR + log_exception
+  RunMacro --> Caller: Abbruch
+  deactivate RunMacro
+else Datei vorhanden
+  FS --> RunMacro: JSON-Inhalt
+  RunMacro -> Data: Parse + Schrittliste aufbauen
+end
+
+== Metadaten ==
+
+opt "$data" vorhanden
+  RunMacro -> Data: handler_data($data)
+  Data --> RunMacro: isLoop / amtLoops
+end
+
+RunMacro -> Listener: startKeyListener()
+Listener --> User: Hinweis "Press CTRL+K to stop"
+
+== Ausfuehrungsmodus ==
+
+alt Infinite Loop (isLoop == true)
+  loop Bis kill == true
+    RunMacro -> Data: run() ueber alle Steps
+
+    loop Pro Schritt
+      RunMacro -> RunMacro: wait(step.sleep)
+      alt Step = mouse move
+        RunMacro -> Handler: handler_mousemove(...)
+        Handler -> WinAPI: SetCursorPos() mit Transition
+      else Step = mouse click
+        RunMacro -> Handler: handler_mouseclick(...)
+        Handler -> WinAPI: mouse_event(down/up)
+      else Step = keyboard
+        RunMacro -> Handler: handler_keyboard(...)
+      else Unbekannter Step
+        RunMacro -> Logger: warning
+      end
+    end
+
+    opt User drueckt CTRL+K
+      User -> Listener: CTRL+K
+      Listener -> RunMacro: kill = true
+    end
+  end
+
+else Fixed Loops (amtLoops > 1)
+  loop Fuer i = 1..amtLoops
+    RunMacro -> Data: run()
+    opt kill gesetzt
+      break
+    end
+  end
+
+else Single Run
+  RunMacro -> Data: run() einmalig
+end
+
+== Abschluss ==
+
+RunMacro -> Listener: stopKeyListener()
+RunMacro -> RunMacro: kill-Flag zuruecksetzen
+RunMacro -> Logger: runMacro finished
+RunMacro --> Caller: Return
+
+deactivate RunMacro
+
+note over RunMacro
+Kernidee fuer die Praesi:
+- Ein Macro ist eine JSON-Schrittliste
+- Jeder Schritt wird zeitgesteuert ausgefuehrt
+- CTRL+K ist der sichere Not-Aus in allen Modi
+end note
+
+@enduml

@@ -1,0 +1,115 @@
+@startuml openfile_sequence
+' RePCC - openfile.py sequence diagram for presentation use
+
+title RePCC openfile.py - Externe Macro-Datei oeffnen, speichern oder ausfuehren
+
+skinparam backgroundColor #FBFCFE
+skinparam shadowing false
+skinparam roundcorner 14
+skinparam sequence {
+  ArrowColor #0F4C81
+  ActorBorderColor #0F4C81
+  ParticipantBorderColor #0F4C81
+  ParticipantBackgroundColor #EAF3FF
+  LifeLineBorderColor #8AAED1
+  LifeLineBackgroundColor #F6FAFF
+  GroupBorderColor #8AAED1
+  GroupBackgroundColor #F5F9FF
+  BoxBackgroundColor #F2F7FF
+  BoxBorderColor #9AB9D9
+}
+skinparam note {
+  BackgroundColor #FFF9E8
+  BorderColor #D6B66A
+}
+
+autonumber "[000]"
+
+actor User
+participant "Windows Shell" as Shell
+participant "openfile.py" as OpenFile
+participant "Logger" as Logger
+participant "Toast UI\n(win11toast)" as Toast
+participant "pcmac.macro" as Macro
+participant "Filesystem" as FS
+participant "MessageBox" as Msg
+
+== Start ==
+
+User -> Shell: Oeffnet .pcmac Datei (Dateizuordnung)
+Shell -> OpenFile: Start mit argv[1] = Datei-Pfad
+activate OpenFile
+
+OpenFile -> Logger: log_state("openfile.main", argv, opened_path)
+OpenFile -> OpenFile: get_opened_file_path()
+
+alt Kein Pfad oder Datei fehlt
+  OpenFile -> Msg: sendErrorBox(".PCMAC File Error", ...)
+  OpenFile -> Logger: warning/error
+  OpenFile --> Shell: exit(1)
+  deactivate OpenFile
+else Pfad gueltig
+  OpenFile -> Toast: sendNotification(..., option=1)
+  Toast --> User: Interaktive Notification\n[Save] [Run] [Ignore]
+end
+
+== User Action ==
+
+alt User klickt Save
+  User -> Toast: Save
+  Toast -> OpenFile: on_click("http:Save")
+
+  OpenFile -> OpenFile: get_opened_file_path()
+  OpenFile -> Macro: verifyStructure(path)
+
+  alt Struktur ungueltig
+    OpenFile -> Msg: sendErrorBox("File is not proper macro format")
+    OpenFile -> Logger: error
+  else Struktur gueltig
+    OpenFile -> OpenFile: verifyName(stem)
+    OpenFile -> FS: json.load(externe Datei)
+    FS --> OpenFile: data
+    OpenFile -> FS: json.dump(data, Roaming/.RePCC/macros/<name>.pcmac)
+    OpenFile -> Toast: sendNotification("Macro was saved as <name>")
+    OpenFile -> Logger: info("saved new external macro")
+  end
+
+else User klickt Run
+  User -> Toast: Run
+  Toast -> OpenFile: on_click("http:Run")
+
+  OpenFile -> OpenFile: get_opened_file_path()
+  OpenFile -> Macro: verifyStructure(path)
+
+  alt Datei fehlt oder Struktur ungueltig
+    OpenFile -> Msg: sendErrorBox("Can not run macro ...")
+    OpenFile -> Logger: error
+  else Gueltige Macro-Datei
+    OpenFile -> Macro: runMacro("<name>.pcmac")
+    Macro --> OpenFile: Start Ausfuehrung
+    OpenFile -> Logger: info("starting macro from external file")
+  end
+
+else User klickt Ignore
+  User -> Toast: Ignore
+  Toast -> OpenFile: on_click("http:Ignore")
+  OpenFile -> Logger: info("ignored by user")
+end
+
+== Fehlerbehandlung ==
+
+group Bei Exceptions in Save/Run
+  OpenFile -> Logger: log_exception(...)
+  OpenFile -> Msg: sendErrorBox("Write block in save ran into a wall")
+end
+
+note over OpenFile
+Dieses Skript bietet dem User nach dem Oeffnen
+externer .pcmac Dateien drei direkte Flows:
+1) In lokale Sammlung speichern
+2) Sofort ausfuehren
+3) Ignorieren
+end note
+
+deactivate OpenFile
+@enduml

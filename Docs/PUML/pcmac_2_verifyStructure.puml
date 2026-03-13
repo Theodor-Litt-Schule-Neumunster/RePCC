@@ -1,0 +1,46 @@
+@startuml pcmac_2_verifyStructure
+
+title RePCC pcmac.py - Detail 1: verifyStructure(...)
+
+skinparam backgroundColor #FDFCF9
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #6C7A89
+  DiamondBackgroundColor #EEF3F8
+  DiamondBorderColor #6C7A89
+  ArrowColor #3A3A3A
+}
+
+start
+:verifyStructure(input);
+
+if (Input ist Dateipfad?) then (ja)
+  :JSON von Datei laden;
+else (nein)
+  :Input als JSON-Dict verwenden;
+endif
+
+if (Daten sind Dict?) then (ja)
+  :Fuer jeden key in data;
+  if (key == $data?) then (ja)
+    :skip;
+  else (nein)
+    :CHECK_layout(req, data);
+    note right: Pruefen ob alle Keys vorhanden
+    :CHECK_keys(req, keytype, data, i);
+    note right: Pruefen ob Werte + Typen stimmen\n(presssleep, transition, actiondata, ...)
+    if (Regeln verletzt?) then (ja)
+      :False zurueckgeben;
+      stop
+    endif
+  endif
+  :naechster key;
+  :True zurueckgeben;
+else (nein)
+  :False zurueckgeben;
+endif
+
+stop
+@enduml
