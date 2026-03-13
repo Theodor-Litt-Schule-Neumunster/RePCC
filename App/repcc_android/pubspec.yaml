@@ -10,7 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_blockly: ^1.6.0
-  flutter_launcher_icons: ^0.14.4
   flutter_svg: ^2.2.0
   multicast_dns: ^0.3.2+7
   shared_preferences: ^2.5.3
@@ -19,6 +18,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -38,3 +38,10 @@ flutter:
           weight: 400
         - asset: Fonts/static/JetBrainsMono-SemiBold.ttf
           weight: 600
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/repcclogo.png
+  adaptive_icon_background: "#1E2A47"
+  adaptive_icon_foreground: assets/repcclogo.png
