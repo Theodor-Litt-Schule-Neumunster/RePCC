@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.repcc_android"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
