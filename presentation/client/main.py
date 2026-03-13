@@ -248,13 +248,16 @@ def _mdnsMain():
             self._connecting = False
 
         def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
+            print(f"\n SERVICE REMOVED\n {zc, type_, name}")
             pass
 
         def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
             self._handle_Service(zc, type_, name)
+            print(f"\n SERVICE UPDATED\n {zc, type_, name}")
 
         def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
             self._handle_Service(zc, type_, name)
+            print(f"\n SERVICE ADDED\n {zc, type_, name}")
 
         def _handle_Service(self, zc: Zeroconf, type_:str, name:str):
 
@@ -324,8 +327,8 @@ def _mdnsMain():
 
             try:
                 info = zc.get_service_info(type_, name)
-            finally:
-                pass
+            except Exception:
+                info = None
 
             if info and "repccpresentationserver" in name.lower():
 

@@ -1,0 +1,89 @@
+@startuml pcmac_1_overview
+' RePCC - complete function map for Backend/windows/pcmac.py
+
+title RePCC pcmac.py - Alle Funktionen (Uebersicht)
+
+skinparam backgroundColor #FDFCF9
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam defaultTextAlignment center
+skinparam packageStyle rectangle
+skinparam ArrowColor #3A3A3A
+skinparam package {
+  BorderColor #7E8A97
+  BackgroundColor #F5F7FA
+}
+skinparam rectangle {
+  BorderColor #6C7A89
+  BackgroundColor #FFFFFF
+}
+
+rectangle "normalize_macro_key_token(raw_key)" as normalize <<function>>
+
+package "class macro" {
+  rectangle "__init__()" as m_init <<method>>
+  rectangle "wait(time_ms)" as m_wait <<method>>
+  rectangle "_keybindListener()" as m_keybind <<method>>
+  rectangle "press(key)\n[nested in _keybindListener]" as m_keybind_press <<nested>>
+  rectangle "startKeyListener()" as m_start_listener <<method>>
+  rectangle "stopKeyListener()" as m_stop_listener <<method>>
+
+  rectangle "verifyStructure(input)" as m_verify <<method>>
+  rectangle "CHECK_layout(req, data)\n[nested in verifyStructure]" as m_check_layout <<nested>>
+  rectangle "CHECK_keys(req, keytype, data, i)\n[nested in verifyStructure]" as m_check_keys <<nested>>
+
+  rectangle "presenter(presenterKey)" as m_presenter <<method>>
+  rectangle "press(key)\n[nested in presenter]" as m_presenter_press <<nested>>
+
+  rectangle "runMacro(MacroName)" as m_run <<method>>
+  rectangle "handler_data(data)\n[nested in runMacro]" as m_h_data <<nested>>
+  rectangle "handler_mousemove(...)\n[nested in runMacro]" as m_h_move <<nested>>
+  rectangle "easing(x)\n[nested in handler_mousemove]" as m_h_ease <<nested>>
+  rectangle "handler_mouseclick(...)\n[nested in runMacro]" as m_h_click <<nested>>
+  rectangle "handler_keyboard(...)\n[nested in runMacro]" as m_h_key <<nested>>
+  rectangle "run()\n[nested in runMacro]" as m_h_run <<nested>>
+}
+
+rectangle "initializePCMAC()" as init <<function>>
+rectangle "fileVerification()\n[nested in initializePCMAC]" as init_file <<nested>>
+rectangle "versionVerification()\n[nested in initializePCMAC]" as init_version <<nested>>
+rectangle "regVerification()\n[nested in initializePCMAC]" as init_reg <<nested>>
+rectangle "restartExplorer()\n[nested in regVerification]" as init_restart <<nested>>
+rectangle "ensure_registry_value(...)\n[nested in regVerification]" as init_ensure <<nested>>
+
+normalize --> m_run : key normalization used
+normalize --> m_presenter : key normalization map
+
+m_keybind --> m_keybind_press
+m_start_listener --> m_keybind
+m_stop_listener --> m_keybind
+
+m_verify --> m_check_layout
+m_verify --> m_check_keys
+m_check_keys --> m_check_layout
+
+m_presenter --> m_presenter_press
+
+m_run --> m_h_data
+m_run --> m_h_move
+m_run --> m_h_click
+m_run --> m_h_key
+m_run --> m_h_run
+m_h_move --> m_h_ease
+m_h_key --> normalize
+m_run --> m_start_listener
+m_run --> m_stop_listener
+m_run --> m_wait
+
+init --> init_version
+init --> init_reg
+init_version --> init_file
+init_reg --> init_ensure
+init_reg --> init_restart
+
+note bottom
+Komplette Funktionslandkarte von pcmac.py,
+inklusive verschachtelter Helper-Funktionen.
+end note
+
+@enduml
