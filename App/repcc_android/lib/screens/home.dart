@@ -7,6 +7,7 @@ import 'dart:io';
 import '../models/device.dart';
 import 'connect.dart';
 import 'macros.dart';
+import 'presenter.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,6 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final deviceIds = devices.map((device) => device.id).toSet();
     _consecutivePingFailures.removeWhere((id, _) => !deviceIds.contains(id));
     _stoppedPollingDeviceIds.removeWhere((id) => !deviceIds.contains(id));
+  }
+
+  bool _hasDeviceId(String id) {
+    return devices.any((device) => device.id == id);
   }
 
   Future<bool> _checkDeviceConnectivity(Device device) async {
@@ -105,7 +110,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _isStatusPollInProgress = true;
     try {
-      for (final device in devices) {
+      final snapshot = List<Device>.from(devices);
+      for (final device in snapshot) {
+        if (!_hasDeviceId(device.id)) {
+          continue;
+        }
+
         if (_stoppedPollingDeviceIds.contains(device.id)) {
           continue;
         }
@@ -139,7 +149,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _isRefreshingStatus = true;
     });
 
-    for (final device in devices) {
+    final snapshot = List<Device>.from(devices);
+    for (final device in snapshot) {
+      if (!_hasDeviceId(device.id)) {
+        continue;
+      }
+
       final isConnected = await _checkDeviceConnectivity(device);
       if (isConnected) {
         device.isConnected = true;
@@ -235,6 +250,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pop(context);
                 Navigator.push(context,
                     MaterialPageRoute(builder: (context) => ConnectScreen()));
+              },
+            ),
+            ListTile(
+              leading: SvgPicture.asset('assets/Icons/arrow_forward.svg',
+                colorFilter:
+                  ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
+                width: 24,
+                height: 24),
+              title: Text('Presenter Tools',
+                style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PresenterScreen(devices: devices)));
               },
             ),
             ListTile(

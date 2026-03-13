@@ -83,10 +83,38 @@ class _ConnectScreenState extends State<ConnectScreen> {
     return false;
   }
 
+  List<int>? _parseIpv4Parts(String ip) {
+    final parts = ip.split('.');
+    if (parts.length != 4) return null;
+
+    final values = <int>[];
+    for (final part in parts) {
+      final parsed = int.tryParse(part);
+      if (parsed == null || parsed < 0 || parsed > 255) {
+        return null;
+      }
+      values.add(parsed);
+    }
+    return values;
+  }
+
+  bool _isSameSubnet24(String ipA, String ipB) {
+    final a = _parseIpv4Parts(ipA);
+    final b = _parseIpv4Parts(ipB);
+    if (a == null || b == null) return false;
+    return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
+  }
+
   bool _belongsToActiveNetwork(
       String discoveredIp, List<InternetAddress> localAddresses) {
     if (!_isUsableNetworkIp(discoveredIp)) return false;
-    return true;
+    if (localAddresses.isEmpty) {
+      // If local interfaces cannot be determined, keep previous behavior.
+      return true;
+    }
+
+    return localAddresses
+        .any((local) => _isSameSubnet24(discoveredIp, local.address));
   }
 
   Iterable<String> _txtEntries(String text) {
