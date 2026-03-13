@@ -309,10 +309,24 @@ class _ConnectScreenState extends State<ConnectScreen> {
   }
 
   void _selectDevice(Device device) {
-    Navigator.pop(context, device);
+    if (!mounted) return;
+
+    final navigator = Navigator.maybeOf(context);
+    if (navigator == null || !navigator.canPop()) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('Unable to return selected device right now.'),
+        ),
+      );
+      return;
+    }
+
+    navigator.pop(device);
   }
 
   bool _isValidHostname(String value) {
+    if (value.toLowerCase() == 'localhost') return false;
+
     // Accept simple LAN hostnames like "office-pc" or "office-pc.local".
     final hostnameRegex = RegExp(
       r'^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$',
@@ -329,6 +343,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
         return false;
       }
     }
+
+    // Reject unroutable/manual-invalid addresses for device targets.
+    if (!_isUsableNetworkIp(value)) return false;
+
     return true;
   }
 
@@ -361,108 +379,155 @@ class _ConnectScreenState extends State<ConnectScreen> {
   Future<void> _showManualAddDialog() async {
     final nameController = TextEditingController();
     final ipController = TextEditingController();
+    final rootMessenger = ScaffoldMessenger.maybeOf(context);
 
-    final newDevice = await showDialog<Device>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Add Device Manually'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontFamily: 'JetBrainsMono'),
-                decoration: const InputDecoration(
-                  labelText: 'Device Name',
+    Device? newDevice;
+    try {
+      newDevice = await showDialog<Device>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Add Device Manually'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontFamily: 'JetBrainsMono'),
+                  decoration: const InputDecoration(
+                    labelText: 'Device Name',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: ipController,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontFamily: 'JetBrainsMono'),
-                decoration: const InputDecoration(
-                  labelText: 'IP Address',
+                const SizedBox(height: 10),
+                TextField(
+                  controller: ipController,
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontFamily: 'JetBrainsMono'),
+                  decoration: const InputDecoration(
+                    labelText: 'IP Address',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              try {
-                final name = nameController.text.trim();
-                final rawAddress = ipController.text.trim();
-                if (name.isEmpty || rawAddress.isEmpty) return;
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                try {
+                  final name = nameController.text.trim();
+                  final rawAddress = ipController.text.trim();
+                  if (name.isEmpty || rawAddress.isEmpty) {
+                    (ScaffoldMessenger.maybeOf(dialogContext) ?? rootMessenger)
+                        ?.showSnackBar(
+                      const SnackBar(
+                        content: Text('Name and IP/hostname are required.'),
+                      ),
+                    );
+                    return;
+                  }
 
-                final parsedAddress = _parseManualAddress(rawAddress);
-                if (parsedAddress == null) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Enter a valid IPv4/hostname, optionally with :port.'),
+                  final parsedAddress = _parseManualAddress(rawAddress);
+                  if (parsedAddress == null) {
+                    (ScaffoldMessenger.maybeOf(dialogContext) ?? rootMessenger)
+                        ?.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Enter a valid IPv4/hostname, optionally with :port.'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final ports = <int>[parsedAddress.port ?? 8080];
+                  Navigator.pop(
+                    dialogContext,
+                    Device(
+                      id: parsedAddress.host,
+                      name: name,
+                      ipAddress: parsedAddress.host,
+                      macAddress: 'Unknown',
+                      ports: ports,
+                      isConnected: false,
                     ),
                   );
-                  return;
-                }
-
-                final ports = <int>[parsedAddress.port ?? 8080];
-
-                Navigator.pop(
-                  dialogContext,
-                  Device(
-                    id: parsedAddress.host,
-                    name: name,
-                    ipAddress: parsedAddress.host,
-                    macAddress: 'Unknown',
-                    ports: ports,
-                    isConnected: false,
-                  ),
-                );
-              } catch (error, stackTrace) {
-                if (kDebugMode) {
-                  debugPrint('Manual add failed: $error');
-                  debugPrintStack(stackTrace: stackTrace);
-                }
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      kDebugMode
-                          ? 'Manual add failed: ${error.toString()}'
-                          : 'Manual add failed. Please check your input.',
+                } catch (error, stackTrace) {
+                  if (kDebugMode) {
+                    debugPrint('Manual add failed: $error');
+                    debugPrintStack(stackTrace: stackTrace);
+                  }
+                  (ScaffoldMessenger.maybeOf(dialogContext) ?? rootMessenger)
+                      ?.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        kDebugMode
+                            ? 'Manual add failed: ${error.toString()}'
+                            : 'Manual add failed. Please check your input.',
+                      ),
                     ),
-                  ),
-                );
-              }
-            },
-            icon: SvgPicture.asset(
-              'assets/Icons/add.svg',
-              colorFilter: ColorFilter.mode(
-                  Theme.of(context).colorScheme.onPrimary, BlendMode.srcIn),
-              width: 18,
-              height: 18,
+                  );
+                }
+              },
+              icon: SvgPicture.asset(
+                'assets/Icons/add.svg',
+                colorFilter: ColorFilter.mode(
+                    Theme.of(context).colorScheme.onPrimary, BlendMode.srcIn),
+                width: 18,
+                height: 18,
+              ),
+              label: const Text('Add Device'),
             ),
-            label: const Text('Add Device'),
+          ],
+        ),
+      );
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Manual add dialog failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      rootMessenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            kDebugMode
+                ? 'Manual add dialog failed: ${error.toString()}'
+                : 'Unable to open manual add dialog right now.',
           ),
-        ],
-      ),
-    );
-
-    nameController.dispose();
-    ipController.dispose();
+        ),
+      );
+    } finally {
+      // Dispose controllers after the dialog teardown frame to avoid
+      // "TextEditingController used after dispose" during route animations.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        nameController.dispose();
+        ipController.dispose();
+      });
+    }
 
     if (newDevice == null || !mounted) return;
-    _selectDevice(newDevice);
+    try {
+      _selectDevice(newDevice);
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Selecting manual device failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      rootMessenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            kDebugMode
+                ? 'Failed to add selected device: ${error.toString()}'
+                : 'Failed to add selected device.',
+          ),
+        ),
+      );
+    }
   }
 
   @override
