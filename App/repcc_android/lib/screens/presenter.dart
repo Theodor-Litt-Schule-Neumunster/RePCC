@@ -120,13 +120,19 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
       if (response.statusCode == 405) {
         lastError =
-            'Device rejected presenter command (405). Pair the phone with /connect first.';
+            'This device is not paired yet. Please connect it first.';
       } else {
-        lastError =
-            'Command failed on port $port (HTTP ${response.statusCode}): $body';
+        if (kDebugMode) {
+          debugPrint(
+              'Presenter command failed: HTTP ${response.statusCode}, body=$body');
+        }
+        lastError = 'Slide command failed. Please try again.';
       }
     } catch (error) {
-      lastError = 'Port $port failed: $error';
+      if (kDebugMode) {
+        debugPrint('Presenter command request error: $error');
+      }
+      lastError = 'Could not reach the device. Please try again.';
     } finally {
       client?.close(force: true);
       if (mounted) {
@@ -171,18 +177,23 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
       final payload = await response.transform(utf8.decoder).join();
       if (response.statusCode != 200 && response.statusCode != 202) {
+        if (kDebugMode) {
+          debugPrint(
+              'Presenter /offer failed: HTTP ${response.statusCode}, payload=$payload');
+        }
         try {
           final decodedError = jsonDecode(payload);
-          if (decodedError is Map && decodedError['error'] != null) {
+          if (response.statusCode == 405) {
             _lastLaserConnectError =
-                'HTTP ${response.statusCode}: ${decodedError['error']}';
+                'This device is not paired yet. Please connect it first.';
+          } else if (decodedError is Map && decodedError['error'] != null) {
+            _lastLaserConnectError =
+                'Could not start presenter connection.';
           } else {
-            _lastLaserConnectError =
-                'HTTP ${response.statusCode}: ${payload.isEmpty ? 'No body' : payload}';
+            _lastLaserConnectError = 'Could not start presenter connection.';
           }
         } catch (_) {
-          _lastLaserConnectError =
-              'HTTP ${response.statusCode}: ${payload.isEmpty ? 'No body' : payload}';
+          _lastLaserConnectError = 'Could not start presenter connection.';
         }
         return null;
       }
@@ -191,10 +202,18 @@ class _PresenterScreenState extends State<PresenterScreen> {
       if (decoded is Map<String, dynamic>) {
         return decoded;
       }
-      _lastLaserConnectError = 'Unexpected JSON payload from server.';
+      _lastLaserConnectError = 'Received an unexpected response from the device.';
       return null;
     } catch (error) {
-      _lastLaserConnectError = 'Request failed: $error';
+      if (kDebugMode) {
+        debugPrint('Presenter /offer request failed: $error');
+      }
+      if (error is TimeoutException) {
+        _lastLaserConnectError =
+            'Connection timed out. Please try again in a moment.';
+      } else {
+        _lastLaserConnectError = 'Could not reach the device.';
+      }
       return null;
     } finally {
       client?.close(force: true);
@@ -370,7 +389,10 @@ class _PresenterScreenState extends State<PresenterScreen> {
           channel.state == RTCDataChannelState.RTCDataChannelOpen;
       return true;
     } catch (error) {
-      _lastLaserConnectError = 'WebRTC setup failed: $error';
+      if (kDebugMode) {
+        debugPrint('WebRTC setup failed: $error');
+      }
+      _lastLaserConnectError = 'Could not start presenter connection.';
       await _closeLaserChannel();
       return false;
     }
@@ -390,9 +412,8 @@ class _PresenterScreenState extends State<PresenterScreen> {
           _lastLaserErrorToastAt = now;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_lastLaserConnectError == null
-                  ? 'Unable to establish WebRTC laser channel.'
-                  : 'Unable to establish WebRTC laser channel: ${_lastLaserConnectError!}'),
+              content: Text(_lastLaserConnectError ??
+                  'Could not start presenter connection. Please try again.'),
             ),
           );
         }

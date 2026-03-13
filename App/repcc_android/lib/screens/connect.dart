@@ -465,12 +465,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   }
                   (ScaffoldMessenger.maybeOf(dialogContext) ?? rootMessenger)
                       ?.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        kDebugMode
-                            ? 'Manual add failed: ${error.toString()}'
-                            : 'Manual add failed. Please check your input.',
-                      ),
+                    const SnackBar(
+                      content: Text('Could not add the device. Please try again.'),
                     ),
                   );
                 }
@@ -493,12 +489,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
         debugPrintStack(stackTrace: stackTrace);
       }
       rootMessenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            kDebugMode
-                ? 'Manual add dialog failed: ${error.toString()}'
-                : 'Unable to open manual add dialog right now.',
-          ),
+        const SnackBar(
+          content: Text('Unable to open manual add right now.'),
         ),
       );
     } finally {
@@ -519,12 +511,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
         debugPrintStack(stackTrace: stackTrace);
       }
       rootMessenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            kDebugMode
-                ? 'Failed to add selected device: ${error.toString()}'
-                : 'Failed to add selected device.',
-          ),
+        const SnackBar(
+          content: Text('Could not use the selected device.'),
         ),
       );
     }
