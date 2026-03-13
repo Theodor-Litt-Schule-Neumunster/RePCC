@@ -7,8 +7,6 @@ import 'package:multicast_dns/multicast_dns.dart';
 import 'dart:async';
 import 'dart:io';
 
-// TODO: Send pings every 10s to enable connection status updates (ping on connect, then start timer that pings every 10s, cancel on disconnect)
-
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});
 
@@ -21,7 +19,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final List<Device> _discoveredDevices = [];
   bool _isScanning = false;
   String _statusMessage = 'Press scan to discover devices';
-  final bool _enableMdnsLogging = true;
+  final bool _enableMdnsLogging = kDebugMode;
 
   void _logMdns(String message) {
     if (!_enableMdnsLogging) return;

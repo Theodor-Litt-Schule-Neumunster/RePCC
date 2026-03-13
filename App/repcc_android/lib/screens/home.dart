@@ -488,12 +488,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         }
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              kDebugMode
-                                  ? 'Failed to add device: ${error.toString()}'
-                                  : 'Failed to add device. Please try again.',
-                            ),
+                          const SnackBar(
+                            content:
+                                Text('Failed to add device. Please try again.'),
                           ),
                         );
                       }

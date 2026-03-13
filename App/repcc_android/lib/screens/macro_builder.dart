@@ -6,8 +6,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/macro.dart';
 
-// TODO: icon for going back from editor view is missing. Replace with SVG.
-
 class MacroBuilderResult {
   final String name;
   final String workspaceJson;
