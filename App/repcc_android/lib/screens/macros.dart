@@ -210,21 +210,27 @@ class _MacroScreenState extends State<MacroScreen> {
         title: const Text('Macros'),
         actions: [
           IconButton(
-            tooltip: 'Open Blockly Macro Builder',
-            onPressed: () => _openMacroBuilder(),
-            icon: const Icon(Icons.account_tree_outlined),
+            tooltip: 'Add macro as JSON',
+            onPressed: () => _upsertMacro(),
+            icon: SvgPicture.asset(
+              'assets/Icons/grid.svg',
+              colorFilter:
+                  ColorFilter.mode(colorScheme.onTertiary, BlendMode.srcIn),
+              width: 22,
+              height: 22,
+            ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _upsertMacro(),
+        onPressed: () => _openMacroBuilder(),
         icon: SvgPicture.asset(
           'assets/Icons/add.svg',
           colorFilter: ColorFilter.mode(colorScheme.onPrimary, BlendMode.srcIn),
           width: 24,
           height: 24,
         ),
-        label: const Text('Add Macro'),
+        label: const Text('Macro Editor'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -271,10 +277,13 @@ class _MacroScreenState extends State<MacroScreen> {
                                 tooltip: 'Edit in Blockly Builder',
                                 onPressed: () =>
                                     _openMacroBuilder(existing: macro),
-                                icon: Icon(
-                                  Icons.account_tree_outlined,
-                                  color:
+                                icon: SvgPicture.asset(
+                                  'assets/Icons/grid.svg',
+                                  colorFilter: ColorFilter.mode(
                                       colorScheme.onTertiary.withOpacity(0.75),
+                                      BlendMode.srcIn),
+                                  width: 22,
+                                  height: 22,
                                 ),
                               ),
                               IconButton(
