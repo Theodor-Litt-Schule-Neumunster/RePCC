@@ -1,3 +1,5 @@
+# pyinstaller --noconfirm --onefile --noconsole --add-data "assets;assets" --icon="./assets/repccBin.ico" main.py
+
 import argparse
 import sys
 
@@ -13,7 +15,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--macros", action="store_true", help="Open macros page")
     parser.add_argument("--devices", action="store_true", help="Open devices page")
     parser.add_argument("--credits", action="store_true", help="Open credits page")
-    return parser.parse_args()
+    # Ignore extra arguments that can be injected by tray/OS launch contexts.
+    args, _unknown = parser.parse_known_args()
+    return args
 
 
 def resolve_start_page(args: argparse.Namespace) -> str:

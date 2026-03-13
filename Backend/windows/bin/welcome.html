@@ -1,1 +1,276 @@
-welcometext
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RePCC Installer - Welcome</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 42px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .version {
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 22px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .section h3 {
+            color: #764ba2;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .section:first-child h3:first-of-type {
+            margin-top: 0;
+        }
+        
+        .feature-list {
+            list-style: none;
+            margin-bottom: 15px;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .tutorial {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        
+        .tutorial strong {
+            color: #764ba2;
+        }
+        
+        .tutorial ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .tutorial li {
+            margin-bottom: 8px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #856404;
+        }
+        
+        .footer {
+            background: white;
+            border-radius: 10px;
+            padding: 20px 30px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                padding: 30px;
+            }
+            
+            .logo {
+                font-size: 32px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">RePCC</div>
+            <div class="subtitle">Remote Personal Computer Control</div>
+            <span class="version">Installer & Setup Guide</span>
+        </div>
+        
+        <div class="content">
+            <!-- Left Column -->
+            <div class="section">
+                <h2>Key Features</h2>
+                <ul class="feature-list">
+                    <li>Control your PC from your Android phone</li>
+                    <li>Works seamlessly over your home network</li>
+                    <li>Create custom macros for frequent tasks</li>
+                    <li>Presentation control & laser pointer</li>
+                    <li>Screen mirroring via WebRTC</li>
+                    <li>Wake-on-LAN PC startup</li>
+                    <li>Simple one-time setup</li>
+                </ul>
+            </div>
+            
+            <!-- Right Column -->
+            <div class="section">
+                <h2>Quick Start</h2>
+                
+                <h3>1. Install This Software</h3>
+                <p>Follow the installer wizard. It will set up the Windows backend service on your PC.</p>
+                
+                <h3>2. Download Mobile App</h3>
+                <p>Install the RePCC Flutter app on your Android device from our project repository.</p>
+                
+                <h3>3. Configure Network</h3>
+                <p>Both devices must be on the same network. The app will automatically discover your PC.</p>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Setup Tutorials</h2>
+            
+            <div class="tutorial">
+                <strong>🔧 Initial Setup</strong>
+                <ol>
+                    <li>Complete the installer wizard</li>
+                    <li>Open Windows Settings → Firewall</li>
+                    <li>Ensure RePCC is allowed through the firewall (both private and public networks)</li>
+                    <li>Note your PC's IP address (Settings → Network & Internet → WiFi → Status)</li>
+                </ol>
+            </div>
+            
+            <div class="tutorial">
+                <strong>📱 Connect Your Mobile Device</strong>
+                <ol>
+                    <li>Install RePCC app on your Android device</li>
+                    <li>Ensure your phone is connected to the same WiFi network</li>
+                    <li>Open the app and tap "Discover PC"</li>
+                    <li>Select your PC from the list that appears</li>
+                    <li>Accept the connection request on your PC (if prompted)</li>
+                </ol>
+            </div>
+            
+            <div class="tutorial">
+                <strong>⌨️ Create Custom Macros</strong>
+                <ol>
+                    <li>In the RePCC app, navigate to Macros</li>
+                    <li>Tap "New Macro" and give it a name</li>
+                    <li>Record mouse movements, clicks, and keyboard inputs</li>
+                    <li>Save the macro</li>
+                    <li>Execute macros anytime with a single tap from your phone</li>
+                </ol>
+            </div>
+            
+            <div class="tutorial">
+                <strong>🎤 Presentation Mode</strong>
+                <ol>
+                    <li>Open your presentation on your PC (PowerPoint, PDF, etc.)</li>
+                    <li>In the RePCC app, select "Presentation Tools"</li>
+                    <li>Use "Next/Previous" buttons to navigate slides</li>
+                    <li>Activate the laser pointer to highlight areas on screen</li>
+                    <li>View presenter notes on your phone while presenting</li>
+                </ol>
+            </div>
+            
+            <div class="warning">
+                <strong>⚠️ Important:</strong> RePCC only works on local networks (LAN). For security, it does not connect over the internet. Both your PC and device must be on the same WiFi network.
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>RePCC</strong> - Control your PC, anywhere in your home</p>
+            <p style="margin-top: 10px; font-size: 12px;">
+                For help and documentation, visit the project repository or check the system logs.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

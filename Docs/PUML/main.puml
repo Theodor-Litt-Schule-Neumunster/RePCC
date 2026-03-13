@@ -1,0 +1,136 @@
+@startuml RePCC Backend - Systemarchitektur
+!theme plain
+skinparam backgroundColor #ffffff
+skinparam componentBackgroundColor #e1f5ff
+skinparam componentBorderColor #01579b
+skinparam packageBackgroundColor #f9f9f9
+skinparam packageBorderColor #888888
+skinparam arrowColor #1f77b4
+skinparam noteBackgroundColor #fff9c4
+skinparam noteBorderColor #f57f17
+skinparam defaultFontSize 12
+
+title RePCC Backend – main.py Systemübersicht
+
+' ─────────────────────────────────────────────
+package "🚀 Startup (MAIN)" as StartupPkg {
+    [MAIN()] as MAIN
+    [wipeSavedIPs()] as WipeIPs
+    [autostartInit()] as AutostartInit
+    [firewallInit()] as FirewallInit
+}
+
+' ─────────────────────────────────────────────
+package "🌐 API Layer (FastAPI)" as APIPkg {
+
+    package "📋 Macros /macro/" as MacroPkg {
+        [GET /macro/getall] as GetAll
+        [GET /macro/get/{name}] as GetOne
+        [GET /macro/run/{name}] as RunMacro
+        [POST /macro/save] as SaveMacro
+        [GET /macro/presenter/{dir}] as Presenter
+    }
+
+    package "⚙ Settings /settings/" as SettingsPkg {
+        [GET /settings/get/{arg}] as GetSetting
+        [POST /settings/post/{arg}] as PostSetting
+    }
+
+    package "🔗 Verbindung" as ConnectPkg {
+        [GET /ping] as Ping
+        [POST /connect] as Connect
+    }
+}
+
+' ─────────────────────────────────────────────
+package "📡 Netzwerk" as NetworkPkg {
+    [mDNS (Zeroconf)] as MDNS
+    [WebRTC Server] as WebRTC
+    [Uvicorn (Port 15248)] as Uvicorn
+}
+
+' ─────────────────────────────────────────────
+package "🖥 System-Integration" as SystemPkg {
+    [Windows Task Scheduler\n(Autostart)] as TaskScheduler
+    [Windows Firewall\n(Ports 15248/15249/15250)] as Firewall
+    [System Tray (pystray)] as Tray
+}
+
+' ─────────────────────────────────────────────
+package "📁 Datenverwaltung" as DataPkg {
+    [register.yaml\n(MACs & IPs)] as Registry
+    [settings/*.yaml] as Settings
+    [macros/*.pcmac] as Macros
+}
+
+' ─────────────────────────────────────────────
+package "🔧 Interne Module" as ModulesPkg {
+    [pcmac.py\n(Macro Engine)] as PCMAC
+    [laser.py\n(Laserpointer)] as Laser
+    [args.py\n(Config & Helpers)] as Args
+    [webrtc.py\n(WebRTC)] as WebRTCMod
+}
+
+' ─────────────────────────────────────────────
+package "📱 Client-App" as ClientPkg {
+    [Android App] as AndroidApp
+}
+
+' ─────────────────────────────────────────────
+' STARTUP FLOW
+MAIN --> WipeIPs
+MAIN --> AutostartInit
+MAIN --> FirewallInit
+MAIN --> MDNS : registerMDNS()
+MAIN --> WebRTC : startWebRTCServer()
+MAIN --> Tray : Thread starten
+MAIN --> Uvicorn : run(port=15248)
+
+' API -> Data
+RunMacro --> Macros : lesen
+SaveMacro --> Macros : schreiben
+GetAll --> Macros : auflisten
+GetOne --> Macros : lesen
+GetSetting --> Settings : lesen
+PostSetting --> Settings : schreiben
+Connect --> Registry : MAC/IP speichern
+Ping --> Registry : IP prüfen
+
+' API -> Module
+RunMacro --> PCMAC : macro().runMacro()
+SaveMacro --> PCMAC : verifyStructure()
+Presenter --> PCMAC : presenter()
+
+' Network
+AndroidApp --> Uvicorn : HTTP (Port 15248)
+AndroidApp --> MDNS : mDNS Discovery
+AndroidApp --> WebRTC : WebRTC (Port 15249)
+
+' System
+AutostartInit --> TaskScheduler
+FirewallInit --> Firewall
+Tray --> PCMAC : Macro aus Tray starten
+Tray --> Registry : Verbindungseinstellungen
+
+' Module dependencies
+PCMAC --> Laser : LaserPointer steuern
+Args --> Settings : YAML lesen
+WebRTCMod --> WebRTC
+
+note top of APIPkg
+  Alle Endpunkte prüfen
+  IP/MAC via register.yaml
+end note
+
+note right of MDNS
+  Service: _repcc._tcp.local.
+  Eigenschaften: MAC, Port, 2FA-Code
+end note
+
+note bottom of Tray
+  Zeigt Makros, Dashboard,
+  Verbindungseinstellungen,
+  Autostart-Toggle
+end note
+
+@enduml

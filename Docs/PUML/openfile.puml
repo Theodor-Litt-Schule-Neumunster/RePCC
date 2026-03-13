@@ -1,0 +1,105 @@
+@startuml OpenFile Presentation Flow
+!theme plain
+skinparam backgroundColor #ffffff
+skinparam sequenceArrowColor #0b7285
+skinparam participantBackgroundColor #e6fcf5
+skinparam participantBorderColor #087f5b
+skinparam actorBackgroundColor #fff4e6
+skinparam actorBorderColor #d9480f
+skinparam noteBackgroundColor #fff9db
+skinparam noteBorderColor #f08c00
+skinparam responseMessageBelowArrow true
+
+title openfile.py - Ablauf beim Oeffnen einer .pcmac-Datei
+
+autonumber
+actor User
+participant "Windows / Explorer" as Explorer
+participant "openfile.py" as OpenFile
+participant "Notification" as Toast
+participant "Macro Engine\n(pcmac.macro)" as Macro
+participant "Dateisystem" as FS
+participant "RePCC Macro Ordner" as MacroStore
+participant "MessageBox" as MsgBox
+
+== 1. Datei wird geoeffnet ==
+
+User -> Explorer: Doppelklick auf .pcmac
+Explorer -> OpenFile: Start mit Pfad in argv
+activate OpenFile
+OpenFile -> OpenFile: get_opened_file_path()
+OpenFile -> FS: Pruefe, ob Pfad existiert
+alt Kein Pfad oder Datei fehlt
+    OpenFile -> MsgBox: Fehler anzeigen
+    OpenFile --> Explorer: Abbruch mit Exit Code 1
+    deactivate OpenFile
+else Gueltiger Pfad
+    OpenFile -> Toast: Interaktive Benachrichtigung anzeigen
+    note right of Toast
+      Optionen:
+      1. Save
+      2. Run
+      3. Ignore
+    end note
+end
+
+== 2. Pfad A: Save ==
+
+User -> Toast: Klick auf "Save"
+Toast -> OpenFile: on_click("http:Save")
+OpenFile -> OpenFile: get_opened_file_path()
+OpenFile -> FS: Pruefe Quelldatei
+OpenFile -> Macro: verifyStructure(path)
+activate Macro
+Macro --> OpenFile: Struktur gueltig / ungueltig
+deactivate Macro
+
+alt Struktur ungueltig
+    OpenFile -> MsgBox: "File is not proper macro format"
+else Datei liegt bereits im RePCC-Macro-Ordner
+    OpenFile -> MsgBox: "Can not save macro if file is in macro save location"
+else Struktur gueltig und extern
+    OpenFile -> OpenFile: verifyName() fuer eindeutigen Namen
+    OpenFile -> FS: Lade JSON aus externer Datei
+    OpenFile -> MacroStore: Speichere als neue .pcmac
+    OpenFile -> Toast: "Macro was saved"
+end
+
+== 3. Pfad B: Run ==
+
+User -> Toast: Klick auf "Run"
+Toast -> OpenFile: on_click("http:Run")
+OpenFile -> OpenFile: get_opened_file_path()
+OpenFile -> FS: Pruefe Quelldatei
+
+alt Datei fehlt
+    OpenFile -> MsgBox: "Can not run macro that does not exist"
+else Datei vorhanden
+    OpenFile -> Macro: verifyStructure(path)
+    activate Macro
+    Macro --> OpenFile: Struktur gueltig / ungueltig
+    deactivate Macro
+
+    alt Struktur ungueltig
+        OpenFile -> MsgBox: "Structure is invalid"
+    else Struktur gueltig
+        OpenFile -> Macro: runMacro(name + ".pcmac")
+        activate Macro
+        note right of Macro
+          Fuehrt das Makro direkt aus,
+          ohne es erst in die Sammlung
+          zu uebernehmen.
+        end note
+        Macro --> OpenFile: Ausfuehrung gestartet
+        deactivate Macro
+    end
+end
+
+== 4. Pfad C: Ignore ==
+
+User -> Toast: Klick auf "Ignore"
+Toast -> OpenFile: on_click("http:Ignore")
+OpenFile --> User: Keine weitere Aktion
+
+deactivate OpenFile
+@enduml

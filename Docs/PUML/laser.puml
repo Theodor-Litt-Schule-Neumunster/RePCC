@@ -1,73 +1,102 @@
-@startuml Laserpointer Ablauf
+@startuml Laserpointer Presentation Flow
+!theme plain
+skinparam backgroundColor #ffffff
+skinparam sequenceArrowColor #1f77b4
+skinparam participantBackgroundColor #e1f5ff
+skinparam participantBorderColor #01579b
+skinparam noteBkgColor #fff9c4
+skinparam noteBorderColor #f57f17
 
-title Laserpointer Steuerung
+title Laser Pointer System - Presentation Flow
 
-Actor User as Caller
+actor User
+participant "Anwendung" as App
 participant "laser.py" as Laser
-participant "LaserOverlay" as Overlay
 participant "Qt Thread" as Qt
+participant "LaserOverlay" as Overlay
+participant "Bildschirm" as Screen
 
-== Laserpointer starten ==
-
-Caller -> Laser: StartLaserpointer()
+== PHASE 1: Initialisierung ==
+autonumber
+User -> App: "Laserpointer aktivieren"
+App -> Laser: **StartLaserpointer()**
 activate Laser
-alt Overlay existiert nicht
-    Laser -> Qt: Thread starten (_qt_loop)
+    Laser --> Laser: overlay existiert?
+    Laser -> Qt: 🧵 Starte Daemon-Thread
     activate Qt
-    Qt -> Qt: QApplication erstellen
-    Qt -> Overlay: LaserOverlay erstellen
-    activate Overlay
-    Overlay -> Overlay: Einstellungen laden
-    Overlay -> Overlay: Fenster konfigurieren\n(Vollbild, transparent)
-    Overlay -> Overlay: Klick-Durchlässigkeit aktivieren
-    Overlay -> Overlay: show()
-    Qt --> Laser: overlay_ready.set()
-    Laser --> Caller: (True, "Erfolg!")
-else Overlay existiert bereits
-    Laser --> Caller: Log: "Nur ein Overlay möglich"
-end
+        Qt -> Qt: QApplication initialisieren
+        Qt -> Overlay: 🎨 Erstelle LaserOverlay
+        activate Overlay
+            note over Overlay
+            • Lade Einstellungen (Farbe, Größe)
+            • Fenster: frameless, fullscreen, immer oben
+            • Mache clickthrough (transparent für Cursor)
+            • Starte Timer (fade, trail)
+            end note
+            Overlay -> Screen: 📺 show()
+        deactivate Overlay
+        Qt --> Laser: ✅ overlay_ready
+    deactivate Qt
+Laser --> App: ✔ Starting erfolg!
 deactivate Laser
 
-== Position aktualisieren ==
-
-Caller -> Laser: UpdateLaserpointer(pos)
-activate Laser
-alt Overlay bereit
-    Laser -> Overlay: updatePos(x, y)
-    Overlay -> Overlay: positionUpdate Signal senden
-    Overlay -> Overlay: _updatePosInternal()
-    Overlay -> Overlay: Bildschirmposition berechnen
-    Overlay -> Overlay: Trail aktualisieren
-    Overlay -> Overlay: fadeout_reset()
-    Overlay -> Overlay: repaint()
-    Laser --> Caller: (True, "Position aktualisiert")
-else Overlay nicht bereit
-    Laser --> Caller: (False, "Overlay nicht bereit")
-end
-deactivate Laser
-
-== Ausblenden (Fadeout) ==
-
-Overlay -> Overlay: Inaktivitäts-Timer abgelaufen
-Overlay -> Overlay: fadeout_start()
-loop Opacity > 0
-    Overlay -> Overlay: fadeout_step()
-    Overlay -> Overlay: Opacity verringern
-    Overlay -> Overlay: repaint()
+== PHASE 2: Position Update (kontinuierlich) ==
+autonumber
+loop 🔄 Mehrmals pro Sekunde
+    User -> App: Mausposition
+    App -> Laser: **UpdateLaserpointer(pos)**
+    activate Laser
+        Laser -> Overlay: updatePos(norm_x, norm_y)
+        activate Overlay
+            note over Overlay: Thread-safe via Signal/Slot
+            Overlay -> Overlay: 📍 Berechne Pixel
+            Overlay -> Overlay: 🌌 Update Trail
+            Overlay -> Overlay: ⏱ Reset Fade-Timer
+            Overlay -> Overlay: 🎨 repaint() anfordern
+            note over Overlay: paintEvent() wird automatisch aufgerufen
+        deactivate Overlay
+    Laser --> App: ✔
+    deactivate Laser
 end
 
-== Laserpointer beenden ==
+== PHASE 3: Rendering ==
+autonumber
+note over Overlay: Bei repaint() aufgerufen
+activate Overlay
+    note over Overlay
+    ⚙ Style laden (default/trail/simple)
+    end note
+    opt Style: "default"
+        Overlay -> Overlay: 🌟 Glow-Gradient malen
+        Overlay -> Overlay: 🔴 Core-Gradient malen
+    end
+    opt Style: "trail"
+        loop Für alle Trail-Punkte
+            Overlay -> Overlay: ✨ Verblasste Punkte zeichnen
+        end
+    end
+    Overlay -> Screen: 📺 Rendern
+deactivate Overlay
 
-Caller -> Laser: ClearLaserpointer()
+== PHASE 4: Fade-Out (nach Inaktivität) ==
+autonumber
+note over Overlay: Nach ~1 Sekunde Inaktivität
+Overlay -> Overlay: ⏱ Inaktivitäts-Timer läuft ab
+Overlay -> Overlay: 👻 fadeout_start()
+loop opacity > 0 (alle 50ms)
+    Overlay -> Overlay: ⬇ opacity -= 0.05
+    Overlay -> Overlay: 🎨 repaint()
+end
+note over Overlay: Laserpointer langsam ausgeblendet
+
+== PHASE 5: Beenden ==
+autonumber
+User -> App: "Laserpointer deaktivieren"
+App -> Laser: **ClearLaserpointer()**
 activate Laser
-alt Overlay existiert
     Laser -> Overlay: close()
-    deactivate Overlay
-    Laser -> Laser: overlay = None
-    Laser --> Caller: (True, "Overlay gelöscht")
-else Overlay existiert nicht
-    Laser --> Caller: (True, "Overlay gelöscht")
-end
+    Laser -> Laser: 🗑 cleanup
+Laser --> App: ✔ Cleared
 deactivate Laser
 
 @enduml

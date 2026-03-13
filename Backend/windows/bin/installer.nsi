@@ -102,6 +102,7 @@ Section "Main (required)" SEC_MAIN
 
   ClearErrors
   File "main.exe"
+  File "RePCC-Desktop.exe"
   File "welcome.html"
   IfErrors 0 +2
   Abort "Failed to copy required application files."
@@ -176,6 +177,7 @@ Section "un.Uninstall RePCC (required)" UNSEC_MAIN
   ExecWait '"$SYSDIR\schtasks.exe" /Delete /TN "\${AUTOSTART_TASK_NAME}" /F' $0
 
   Delete "$INSTDIR\main.exe"
+  Delete "$INSTDIR\RePCC-Desktop.exe"
   Delete "$INSTDIR\openfile.exe"
   Delete "$INSTDIR\welcome.html"
   Delete "$INSTDIR\Uninstall.exe"
